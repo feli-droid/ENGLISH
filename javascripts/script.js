@@ -1,238 +1,535 @@
-/* ================= Helpers ================= */
+/* =========================================================
+   Casino Night — game logic
+   Sections: Firebase, data (categories/questions), settings,
+   screens, player-selection slot machine, roulette wheel,
+   betting + question flow.
+   ========================================================= */
+
+/* ---------- small helpers ---------- */
 const $ = id => document.getElementById(id);
-const TAU = Math.PI * 2, MAX = 23;
-const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;          // random integer a..b
+const TAU = Math.PI * 2;
+const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const show = (id, on) => $(id).classList.toggle('hidden', !on);
-const NAMES = { red: 'RED', black: 'BLACK', green: 'GREEN' };
-const cs = c => '<span class="' + (c === 'red' ? 'r' : c === 'black' ? 'b' : 'g') + '">' + NAMES[c] + '</span>';
-const LABEL = { safe: 'SAFE', out: 'OUT', prize: 'PRIZE' };
+const screen = id => { ['startScreen','settingsScreen','selectScreen','rouletteScreen','historyScreen'].forEach(s => show(s, s === id)); };
 
-/* ================= Sounds (Web Audio API, no files needed) ================= */
-let audioCtx = null, soundOn = true, lastTick = 0;
+/* ---------- Firebase Realtime Database (REST, no SDK needed) ---------- */
+const FIREBASE_URL = 'https://proyecto-ia-55108-default-rtdb.firebaseio.com';
+async function fbGet(path) {
+  try { const r = await fetch(FIREBASE_URL + path + '.json'); return await r.json(); }
+  catch (e) { console.warn('Firebase GET failed', e); return null; }
+}
+async function fbPatch(path, data) {
+  try { await fetch(FIREBASE_URL + path + '.json', { method: 'PATCH', body: JSON.stringify(data) }); }
+  catch (e) { console.warn('Firebase PATCH failed', e); }
+}
+const blankRecord = () => ({ wins: 0, losses: 0, winsOdd: 0, winsEven: 0, winsRed: 0, winsBlack: 0, winsGreen: 0, questionsCorrect: 0, questionsAnswered: 0, happyFaces: 0 });
 
-function ac() {
-  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-  return audioCtx;
+// Firebase RTDB keys can't contain . # $ [ ] / — turn a student's name into a safe key.
+function slug(name) { return (name || '').trim().replace(/[.#$[\]/]/g, '_') || 'unnamed'; }
+
+// Reads a user's record, applies a patch function to it, and saves it back.
+async function updateUserHistory(name, mutate) {
+  const key = slug(name);
+  const current = (await fbGet('/users/' + key)) || blankRecord();
+  const rec = Object.assign(blankRecord(), current);
+  mutate(rec);
+  await fbPatch('/users/' + key, rec);
+  return rec;
 }
-// one short beep: frequency, start delay (s), duration (s), wave type, volume
-function tone(freq, delay, dur, type = 'sine', vol = 0.15) {
-  if (!soundOn) return;
-  const c = ac(), t = c.currentTime + delay;
-  const o = c.createOscillator(), g = c.createGain();
-  o.type = type;
-  o.frequency.setValueAtTime(freq, t);
-  g.gain.setValueAtTime(vol, t);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  o.connect(g); g.connect(c.destination);
-  o.start(t); o.stop(t + dur);
-}
-const sound = {
-  // each time the ball / pointer passes a slot (limited so it never turns into a buzz)
-  tick() {
-    const now = performance.now();
-    if (now - lastTick < 35) return;
-    lastTick = now;
-    tone(1500, 0, 0.03, 'square', 0.04);
+
+/* ---------- Question bank (SAMPLE — more can be added later) ----------
+   Each category has easy / medium / hard arrays. Every question is a
+   short multiple-choice / "is this correct" style item. */
+const QUESTIONS = {
+  "Should, could, would": {
+    easy: [
+      { q: 'Which word correctly completes: "You ___ see a doctor if you feel sick."', options: ['should', 'would', 'must not'], correct: 0 },
+      { q: 'Is this sentence correct: "She could to swim when she was five"?', options: ['Yes, leave it as is', 'No, remove "to"', 'No, change "could" to "should"'], correct: 1 }
+    ],
+    medium: [
+      { q: 'Which option best completes: "If I had more time, I ___ travel more."', options: ['would', 'should', 'must'], correct: 0 },
+      { q: 'Select the correct form: "You ___ have called me earlier." (regret about the past)', options: ['should', 'would', 'can'], correct: 0 }
+    ],
+    hard: [
+      { q: 'Choose the best option: "___ you mind closing the window?" (polite request)', options: ['Would', 'Should', 'Must'], correct: 0 },
+      { q: 'Which is correct: "I would rather you ___ late than not at all."', options: ['came', 'come', 'coming'], correct: 0 }
+    ]
   },
-  spinStart() { tone(180, 0, 0.3, 'sawtooth', 0.06); tone(320, 0.1, 0.3, 'sawtooth', 0.05); tone(520, 0.2, 0.3, 'sawtooth', 0.04); },
-  ding() { tone(880, 0, 0.35, 'triangle', 0.18); tone(1320, 0.08, 0.4, 'triangle', 0.12); },
-  land() { tone(140, 0, 0.25, 'sine', 0.35); tone(90, 0.03, 0.3, 'sine', 0.3); },
-  win() { [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.12, 0.28, 'triangle', 0.18)); },
-  lose() { [392, 330, 262, 196].forEach((f, i) => tone(f, i * 0.22, 0.4, 'sawtooth', 0.11)); },
-  prize() {
-    [523, 659, 784, 1047, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.11, 0.3, 'square', 0.09));
-    [1568, 2093, 1568, 2093].forEach((f, i) => tone(f, 0.9 + i * 0.09, 0.2, 'triangle', 0.14));   // coin sparkle
+  "Passive voice": {
+    easy: [
+      { q: 'Turn into passive: "They clean the office every day."', options: ['The office is cleaned every day.', 'The office cleans every day.', 'The office was clean every day.'], correct: 0 },
+      { q: 'Is this passive sentence correct: "The cake was eaten by the children"?', options: ['Yes, leave it as is', 'No, should be "is eaten"', 'No, should be "eaten was"'], correct: 0 }
+    ],
+    medium: [
+      { q: 'Choose the correct passive form: "The report ___ by Monday."', options: ['will finish', 'will be finished', 'will finished'], correct: 1 },
+      { q: 'Select the best passive version of "Someone has stolen my bike."', options: ['My bike has been stolen.', 'My bike has stolen.', 'My bike was being stolen.'], correct: 0 }
+    ],
+    hard: [
+      { q: 'Which is the correct passive of "They were repairing the road"?', options: ['The road was being repaired.', 'The road is being repaired.', 'The road has being repaired.'], correct: 0 },
+      { q: 'Choose the correct form: "It ___ that the project will succeed."', options: ['is believed', 'is believing', 'believes'], correct: 0 }
+    ]
+  },
+  "Present perfect": {
+    easy: [
+      { q: 'Which is correct: "I ___ never been to Paris."', options: ['have', 'has', 'had'], correct: 0 },
+      { q: 'Is this correct: "She has went to the store"?', options: ['Yes, leave it as is', 'No, change to "has gone"', 'No, change to "have went"'], correct: 1 }
+    ],
+    medium: [
+      { q: 'Choose the best option: "They ___ lived here since 2015."', options: ['have', 'has', 'are'], correct: 0 },
+      { q: 'Select the correct sentence.', options: ['He has just finished his homework.', 'He has just finish his homework.', 'He have just finished his homework.'], correct: 0 }
+    ],
+    hard: [
+      { q: 'Choose the correct form: "By the time you arrive, I ___ already left."', options: ['will have', 'have', 'had'], correct: 0 },
+      { q: 'Which sentence uses the present perfect correctly?', options: ['I have seen that movie three times.', 'I have see that movie three times.', 'I has seen that movie three times.'], correct: 0 }
+    ]
+  },
+  "Used to": {
+    easy: [
+      { q: 'Which is correct: "I ___ play soccer every weekend when I was a kid."', options: ['used to', 'use to', 'was used'], correct: 0 },
+      { q: 'Is this correct: "She didn\u2019t used to like coffee"?', options: ['Yes, leave it as is', 'No, change to "didn\u2019t use to"', 'No, change to "doesn\u2019t used to"'], correct: 1 }
+    ],
+    medium: [
+      { q: 'Choose the correct question form.', options: ['Did you use to live in Bogotá?', 'Did you used to live in Bogotá?', 'Were you used to live in Bogotá?'], correct: 0 },
+      { q: 'Select the sentence that means "I am accustomed to working at night."', options: ['I am used to working at night.', 'I used to work at night.', 'I use to working at night.'], correct: 0 }
+    ],
+    hard: [
+      { q: 'Which sentence contrasts past habit with the present correctly?', options: ['I used to hate vegetables, but now I love them.', 'I use to hate vegetables, but now I loved them.', 'I am used to hate vegetables, but now I love them.'], correct: 0 },
+      { q: 'Choose the correct form: "It took time, but I ___ to the new schedule."', options: ['got used', 'used', 'use'], correct: 0 }
+    ]
   }
 };
-$('soundBtn').onclick = () => {
-  soundOn = !soundOn;
-  $('soundBtn').textContent = 'Sound: ' + (soundOn ? 'ON' : 'OFF');
-  $('soundBtn').setAttribute('aria-pressed', soundOn);
-  if (soundOn) sound.ding();
+const ALL_CATEGORIES = Object.keys(QUESTIONS);
+
+/* ---------- Default roster (editable in Settings) ---------- */
+const DEFAULT_NAMES = ['Sneyder','Esteban','Sofía','Santiago','Leonel','Jose Angel','Frayden','Gouveia',
+  'Raymond','Marlon','Julián','Sebastian','Camilo','Yeison','Deyvid','Camila','Mauricio','Nicole',
+  'Dilan','Stephanie','Karen','Anaya','Yojhan','Felis'];
+
+/* ---------- Settings state (defaults) ---------- */
+const settings = {
+  playerCount: 3,
+  names: DEFAULT_NAMES.slice(),
+  askQuestions: true,
+  odds: { easy: 45, medium: 40, hard: 15 },
+  enabledCategories: new Set(ALL_CATEGORIES)
 };
 
-/* ================= Game state ================= */
-let banned = {};            // { playerNumber: roundsLeft } -> players sitting out
-let chosen = [], nSpins = 0, nRot = 0;   // phase 1
-let players = [], turn = 0, bet = null, forced = null, ball = null, ballAngle = 0;   // phase 2
+/* ---------- Settings screen wiring ---------- */
+function buildCategoryList() {
+  $('catList').innerHTML = ALL_CATEGORIES.map(cat =>
+    '<label><input type="checkbox" class="catChk" value="' + cat + '" checked> ' + cat + '</label>').join('');
+}
+buildCategoryList();
 
-/* ================= Shared drawing: casino rim with gold bulbs ================= */
-const S = 380;
-function drawRim(ctx, innerR) {
-  const outer = S / 2 - 4;
-  ctx.beginPath(); ctx.arc(S/2, S/2, outer, 0, TAU); ctx.fillStyle = '#3b1d0e'; ctx.fill();          // wood ring
-  ctx.lineWidth = 3; ctx.strokeStyle = '#e2b93b'; ctx.stroke();
-  const bulbR = (outer + innerR) / 2;
-  for (let i = 0; i < 36; i++) {                                                                     // bulbs
-    const a = i * TAU / 36;
-    ctx.beginPath(); ctx.arc(S/2 + Math.cos(a) * bulbR, S/2 + Math.sin(a) * bulbR, 3.8, 0, TAU);
-    ctx.fillStyle = i % 2 ? '#fff3b0' : '#e2b93b'; ctx.fill();
+/* number-of-players: a clickable 1-10 grid instead of typing a number */
+function buildCountGrid() {
+  const box = $('countGrid');
+  box.innerHTML = '';
+  for (let n = 1; n <= 10; n++) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'count-btn' + (n === settings.playerCount ? ' selected' : '');
+    b.textContent = n; b.dataset.n = n;
+    b.onclick = () => {
+      settings.playerCount = n;
+      [...box.children].forEach(x => x.classList.toggle('selected', x === b));
+      checkNames();
+    };
+    box.appendChild(b);
   }
-  ctx.beginPath(); ctx.arc(S/2, S/2, innerR, 0, TAU); ctx.lineWidth = 3; ctx.strokeStyle = '#e2b93b'; ctx.stroke();
 }
+buildCountGrid();
+$('namesBox').value = settings.names.join('\n');
 
-/* ================= PHASE 1: number wheel (1-23), spun 3 times ================= */
-const nX = $('numWheel').getContext('2d'), R1 = S / 2 - 30;
-function drawNum() {
-  const sl = TAU / MAX;
-  nX.clearRect(0, 0, S, S);
-  drawRim(nX, R1);
-  nX.save(); nX.translate(S/2, S/2); nX.rotate(nRot);
-  for (let i = 0; i < MAX; i++) {
-    nX.beginPath(); nX.moveTo(0, 0); nX.arc(0, 0, R1, i * sl, (i + 1) * sl); nX.closePath();
-    nX.fillStyle = i % 2 ? '#0a3d2a' : '#12603f'; nX.fill();
-    nX.strokeStyle = '#e2b93b'; nX.lineWidth = 1.5; nX.stroke();
-    nX.save(); nX.rotate((i + .5) * sl); nX.translate(R1 * .76, 0); nX.rotate(Math.PI / 2);
-    nX.fillStyle = '#fff3b0'; nX.font = '600 17px Oswald, sans-serif'; nX.textAlign = 'center'; nX.textBaseline = 'middle';
-    nX.fillText(i + 1, 0, 0); nX.restore();
+function checkNames() {
+  const names = $('namesBox').value.split('\n').map(s => s.trim()).filter(Boolean);
+  const ok = names.length >= settings.playerCount;
+  $('namesHint').textContent = ok ? '' : 'Add at least ' + settings.playerCount + ' names (currently ' + names.length + ').';
+  return ok;
+}
+$('namesBox').addEventListener('input', checkNames);
+
+function checkOdds() {
+  const e = +$('pEasy').value, m = +$('pMedium').value, h = +$('pHard').value, total = e + m + h;
+  $('oddsHint').textContent = total === 100 ? '' : 'These three numbers should add up to 100 (currently ' + total + ').';
+  return total === 100;
+}
+['pEasy', 'pMedium', 'pHard'].forEach(id => $(id).addEventListener('input', checkOdds));
+
+$('gearBtn').onclick = () => { buildCountGrid(); $('namesBox').value = settings.names.join('\n'); checkNames(); screen('settingsScreen'); };
+$('backFromSettings').onclick = () => screen('startScreen');
+$('saveSettings').onclick = () => {
+  if (!checkOdds() || !checkNames()) return;
+  settings.askQuestions = $('askQuestions').checked;
+  settings.odds = { easy: +$('pEasy').value, medium: +$('pMedium').value, hard: +$('pHard').value };
+  settings.enabledCategories = new Set([...document.querySelectorAll('.catChk:checked')].map(c => c.value));
+  if (settings.enabledCategories.size === 0) settings.enabledCategories = new Set(ALL_CATEGORIES);
+  settings.names = $('namesBox').value.split('\n').map(s => s.trim()).filter(Boolean);
+  screen('startScreen');
+};
+
+$('startBtn').onclick = () => { buildReels(); screen('selectScreen'); };
+
+/* ---------- classification table (reads every roster name's record from Firebase) ---------- */
+$('historyBtn').onclick = async () => {
+  screen('historyScreen');
+  $('historyMsg').textContent = 'Loading...';
+  $('historyBody').innerHTML = '';
+  const rows = await Promise.all(settings.names.map(async name => {
+    const rec = Object.assign(blankRecord(), (await fbGet('/users/' + slug(name))) || {});
+    return { name, rec };
+  }));
+  const topWins = Math.max(0, ...rows.map(r => r.rec.wins));
+  $('historyBody').innerHTML = rows.map(({ name, rec }) =>
+    '<tr' + (rec.wins > 0 && rec.wins === topWins ? ' class="top-player"' : '') + '><td>' + name + '</td><td>' +
+    (rec.happyFaces > 0 ? '😄×' + rec.happyFaces : '—') + '</td><td>' + rec.wins + '</td><td>' + rec.losses + '</td><td>' +
+    rec.winsOdd + '</td><td>' + rec.winsEven + '</td><td>' + rec.winsRed + '</td><td>' + rec.winsBlack + '</td><td>' +
+    rec.winsGreen + '</td><td>' + rec.questionsCorrect + '</td><td>' + rec.questionsAnswered + '</td></tr>').join('');
+  $('historyMsg').textContent = '';
+};
+$('backFromHistory').onclick = () => screen('startScreen');
+
+/* =========================================================
+   PLAYER SELECTION — slot-machine reels, one per player,
+   each one locks on a unique number from 1 to 23.
+   ========================================================= */
+let chosenPlayers = [];
+const ITEM_H = 90;        // must match .reel-item height in style.css
+const STRIP_LEN = 24;     // how many numbers scroll past before landing
+
+function buildReels() {
+  chosenPlayers = [];
+  const box = $('reels');
+  box.innerHTML = '';
+  for (let i = 0; i < settings.playerCount; i++) {
+    const reel = document.createElement('div');
+    reel.className = 'reel';
+    const strip = document.createElement('div');
+    strip.className = 'reel-strip';
+    strip.style.transform = 'translateY(0)';
+    const first = document.createElement('div');
+    first.className = 'reel-item'; first.textContent = '?';
+    strip.appendChild(first);
+    reel.appendChild(strip);
+    box.appendChild(reel);
   }
-  nX.restore();
+  $('selectMsg').textContent = 'Press SPIN to pick the players';
+  $('spinReels').disabled = false; $('spinReels').textContent = 'SPIN';
 }
-const resetPicks = () => { $('picks').innerHTML = '<div class="seat"><b>?</b>Player</div>'.repeat(3); };
-function banText() {
-  const k = Object.keys(banned);
-  $('banNote').textContent = k.length ? 'Sitting out: ' + k.map(n => '#' + n + ' (' + banned[n] + ' rounds)').join(', ') : '';
-}
-resetPicks(); banText(); drawNum();
 
-function spinNum() {
-  $('spin').disabled = true;
-  sound.spinStart();
-  const avail = [];
-  for (let n = 1; n <= MAX; n++) if (!banned[n] && !chosen.includes(n)) avail.push(n);   // no repeats, no benched players
-  const w = avail[rnd(0, avail.length - 1)], sl = TAU / MAX;
-  const fin = nRot - (nRot % TAU) + TAU * rnd(6, 7) - ((w - 1) * sl + sl / 2) + 1.5 * Math.PI;   // whole turns: lands exactly on w
-  const st = nRot, d = fin - st, t0 = performance.now();
-  let lastIdx = -1;
-  (function f(now) {
-    const t = Math.min(1, (now - t0) / 3200);
-    nRot = st + d * (1 - Math.pow(1 - t, 3)); drawNum();
-    const idx = Math.floor(((((1.5 * Math.PI - nRot) % TAU) + TAU) % TAU) / sl);      // slot under the pointer
-    if (idx !== lastIdx) { lastIdx = idx; sound.tick(); }
-    if (t < 1) return requestAnimationFrame(f);
-    nRot %= TAU; chosen.push(w); nSpins++; sound.ding();
-    $('picks').children[nSpins - 1].innerHTML = '<b>' + w + '</b>Player ' + nSpins;
-    if (nSpins < 3) $('msg1').textContent = 'Spin ' + (nSpins + 1) + ' of 3';
-    else { $('msg1').textContent = 'Players ready!'; $('spin').textContent = 'CONTINUE'; }
-    $('spin').disabled = false;
-  })(t0);
-}
-$('spin').onclick = () => nSpins < 3 ? spinNum() : startPhase2();
+$('spinReels').onclick = () => {
+  if (chosenPlayers.length >= settings.playerCount) return startRoulettePhase();
+  if (settings.names.length < settings.playerCount) {
+    $('selectMsg').textContent = 'Not enough names in Settings for ' + settings.playerCount + ' players.';
+    return;
+  }
+  $('spinReels').disabled = true;
+  $('selectMsg').textContent = 'Spinning...';
 
-/* ================= PHASE 2: color roulette with an orbiting ball ================= */
-// 25 slots: 24 alternating red/black + exactly ONE green
-const COLORS = Array.from({ length: 24 }, (_, i) => i % 2 ? 'black' : 'red').concat('green');
-const N = COLORS.length;
+  // Decide every reel's final (unique) name up front, then animate them all at once.
+  const pool = settings.names;
+  const finals = [];
+  while (finals.length < settings.playerCount) {
+    const n = pool[rnd(0, pool.length - 1)];
+    if (!finals.includes(n)) finals.push(n);
+  }
+
+  const strips = [...document.querySelectorAll('.reel-strip')];
+  const waits = strips.map((strip, i) => new Promise(resolveOne => {
+    // Build a strip of random names, ending on this reel's final name.
+    strip.innerHTML = '';
+    for (let k = 0; k < STRIP_LEN - 1; k++) {
+      const d = document.createElement('div');
+      d.className = 'reel-item'; d.textContent = pool[rnd(0, pool.length - 1)];
+      strip.appendChild(d);
+    }
+    const last = document.createElement('div');
+    last.className = 'reel-item'; last.textContent = finals[i];
+    strip.appendChild(last);
+
+    strip.style.transition = 'none';
+    strip.style.transform = 'translateY(0)';
+    void strip.offsetHeight;                         // force reflow so the reset above is applied first
+    const duration = 2.4 + i * 0.18 + Math.random() * 0.3;   // slight stagger so they don't all freeze in sync
+    strip.style.transition = 'transform ' + duration + 's cubic-bezier(.1,.75,.25,1)';
+    strip.style.transform = 'translateY(-' + ((STRIP_LEN - 1) * ITEM_H) + 'px)';
+    strip.addEventListener('transitionend', function done() {
+      strip.removeEventListener('transitionend', done);
+      resolveOne();
+    }, { once: true });
+  }));
+
+  Promise.all(waits).then(() => {
+    chosenPlayers = finals;
+    $('selectMsg').textContent = 'Players ready: ' + chosenPlayers.join(', ');
+    $('spinReels').textContent = 'CONTINUE'; $('spinReels').disabled = false;
+  });
+};
+
+/* =========================================================
+   ROULETTE PHASE
+   ========================================================= */
+const RED_NUMBERS = new Set([1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36]);
+function colorOf(n) { if (n === 0) return 'green'; return RED_NUMBERS.has(n) ? 'red' : 'black'; }
 const HEX = { red: '#c62828', black: '#151515', green: '#22b45a' };
-const rX = $('rrWheel').getContext('2d'), R2 = S / 2 - 30;
 
-function drawRR() {
-  const sl = TAU / N;
-  rX.clearRect(0, 0, S, S);
-  drawRim(rX, R2);
+let players = [], turn = 0, phase = 'bet', ball = null, ballAngle = 0;
+const S = 380, cv = $('wheel'), cx = cv.getContext('2d');
+
+function drawWheel() {
+  const N = 37, sl = TAU / N, R = S / 2 - 6;
+  cx.clearRect(0, 0, S, S);
   for (let i = 0; i < N; i++) {
-    rX.beginPath(); rX.moveTo(S/2, S/2); rX.arc(S/2, S/2, R2, i * sl - Math.PI/2, (i + 1) * sl - Math.PI/2); rX.closePath();
-    rX.fillStyle = HEX[COLORS[i]]; rX.fill(); rX.strokeStyle = '#e2b93b'; rX.lineWidth = 1.5; rX.stroke();
+    cx.beginPath(); cx.moveTo(S/2, S/2); cx.arc(S/2, S/2, R, i * sl - Math.PI/2, (i + 1) * sl - Math.PI/2); cx.closePath();
+    cx.fillStyle = HEX[colorOf(i)]; cx.fill(); cx.strokeStyle = '#e2b93b'; cx.lineWidth = 1.2; cx.stroke();
+    cx.save(); cx.translate(S/2, S/2); cx.rotate(i * sl - Math.PI/2 + sl/2); cx.translate(R * .82, 0); cx.rotate(Math.PI/2);
+    cx.fillStyle = '#fff3b0'; cx.font = '600 11px Oswald, sans-serif'; cx.textAlign = 'center'; cx.textBaseline = 'middle';
+    cx.fillText(i, 0, 0); cx.restore();
   }
-  rX.beginPath(); rX.arc(S/2, S/2, 28, 0, TAU); rX.fillStyle = '#e2b93b'; rX.fill();               // center cap
-  if (ball !== null) {                                                                              // the ball
-    const x = S/2 + Math.cos(ball) * (R2 - 18), y = S/2 + Math.sin(ball) * (R2 - 18);
-    rX.beginPath(); rX.arc(x + 1.5, y + 2, 10, 0, TAU); rX.fillStyle = 'rgba(0,0,0,.5)'; rX.fill();
-    rX.beginPath(); rX.arc(x, y, 9, 0, TAU); rX.fillStyle = '#fff'; rX.fill();
+  cx.beginPath(); cx.arc(S/2, S/2, 24, 0, TAU); cx.fillStyle = '#e2b93b'; cx.fill();           // hub
+  if (ball !== null) {
+    const r = ball.r, x = S/2 + Math.cos(ball.a) * r, y = S/2 + Math.sin(ball.a) * r;
+    cx.beginPath(); cx.arc(x + 2, y + 2, 8, 0, TAU); cx.fillStyle = 'rgba(0,0,0,.5)'; cx.fill();
+    cx.beginPath(); cx.arc(x, y, 7, 0, TAU); cx.fillStyle = '#fff'; cx.fill();
   }
 }
-drawRR();
+drawWheel();
 
-function startPhase2() {
-  show('phase1', false); show('phase2', true);
-  players = chosen.map(n => ({ num: n, status: '', green: false }));
-  turn = 0; forced = null; ball = null; drawRR(); beginTurn();
+let pendingList = [], qIndex = 0;
+
+function startRoulettePhase() {
+  players = chosenPlayers.map(name => ({ name, colorBet: null, parityBet: null, status: '', landedColor: null, landedParity: null, happyGain: 0 }));
+  turn = 0; phase = 'spin'; screen('rouletteScreen'); beginSpinTurn();
 }
 
-function render() {
+function renderSeats() {
   const ended = !$('endBox').classList.contains('hidden');
   $('status').innerHTML = players.map((p, i) =>
-    '<div class="seat ' + p.status + (i === turn && !ended ? ' current' : '') + '"><b>' + p.num + '</b>P' + (i + 1) +
-    '<br><span>' + (LABEL[p.status] || '&nbsp;') + '</span></div>').join('');
+    '<div class="seat ' + p.status + (i === turn && !ended ? ' current' : '') + '"><b>' + p.name + '</b>' +
+    '<br><span>' + ({safe:'SAFE', out:'OUT', pending:'?'}[p.status] || '&nbsp;') + '</span></div>').join('');
 }
+function colorSpan(c) { return '<span class="' + (c === 'red' ? 'r' : c === 'black' ? 'b' : 'g') + '">' + c.toUpperCase() + '</span>'; }
 
-function beginTurn() {
-  render();
+/* ---- for every player, in turn: place a bet, then spin right away ---- */
+function beginSpinTurn() {
+  renderSeats();
   const p = players[turn];
-  $('turnTitle').textContent = "Player " + (turn + 1) + "'s turn (#" + p.num + ")";
-  ['betRow', 'go', 'colorRow', 'nextTurn', 'endBox'].forEach(id => show(id, false));
-  if (forced) {                                              // bet chosen by the previous player's prize
-    bet = forced; forced = null; show('go', true);
-    $('msg2').innerHTML = 'Forced bet: ' + cs(bet) + '. Spin!';
-  } else {
-    show('betRow', true); $('msg2').textContent = 'Place your bet';
-  }
+  ball = null; drawWheel();
+  $('turnTitle').textContent = p.name + "'s turn";
+  ['spinWheel','slotStage','questionBox','nextTurn','endBox'].forEach(id => show(id, false));
+  show('wheelbox', true); show('betRow', true); show('fireFx', false);
+  $('spinWheel').disabled = false;
+  document.querySelectorAll('.bet-color,.parity').forEach(b => { b.disabled = false; b.classList.remove('selected'); });
+  $('bettingMsg').textContent = 'Pick a color and odd or even, then spin';
 }
 
-document.querySelectorAll('.bet').forEach(b => b.onclick = () => {
-  bet = b.dataset.c; show('betRow', false); show('go', true);
-  $('msg2').innerHTML = 'You bet ' + cs(bet) + '. Spin!';
+document.querySelectorAll('.bet-color').forEach(b => b.onclick = () => {
+  players[turn].colorBet = b.dataset.c;
+  document.querySelectorAll('.bet-color').forEach(x => x.classList.toggle('selected', x === b));
+  maybeEnableSpin();
 });
-document.querySelectorAll('.pick').forEach(b => b.onclick = () => {
-  forced = b.dataset.c; show('colorRow', false); show('nextTurn', true);
-  $('msg2').innerHTML = 'The next player will bet ' + cs(forced) + '.';
+document.querySelectorAll('.parity').forEach(b => b.onclick = () => {
+  players[turn].parityBet = b.dataset.p;
+  document.querySelectorAll('.parity').forEach(x => x.classList.toggle('selected', x === b));
+  maybeEnableSpin();
 });
+function maybeEnableSpin() {
+  const p = players[turn];
+  if (p.colorBet && p.parityBet) { show('spinWheel', true); $('bettingMsg').textContent = 'Bet locked in. Spin!'; }
+}
 
-$('go').onclick = () => {
-  $('go').disabled = true; $('msg2').textContent = 'No more bets...';
-  sound.spinStart();
-  const w = rnd(0, N - 1), sl = TAU / N, target = w * sl + sl / 2 - Math.PI / 2;
-  const st = ballAngle, fin = st - (st % TAU) + TAU * rnd(6, 7) + target, d = fin - st, t0 = performance.now();
-  let lastIdx = -1;
+$('spinWheel').onclick = () => {
+  $('spinWheel').disabled = true;
+  document.querySelectorAll('.bet-color,.parity').forEach(b => b.disabled = true);
+  $('bettingMsg').textContent = 'Spinning...';
+  const winner = rnd(0, 36), N = 37, sl = TAU / N, target = winner * sl + sl/2 - Math.PI/2;
+  const outerR = S/2 + 4, innerR = S/2 - 40;
+  const st = ballAngle, fin = st - (st % TAU) + TAU * rnd(6,7) + target, d = fin - st, t0 = performance.now(), dur = 3800;
   (function f(now) {
-    const t = Math.min(1, (now - t0) / 3800);
-    ballAngle = st + d * (1 - Math.pow(1 - t, 3)); ball = ballAngle; drawRR();
-    const idx = Math.floor(((((ballAngle + Math.PI / 2) % TAU) + TAU) % TAU) / sl);   // slot under the ball
-    if (idx !== lastIdx) { lastIdx = idx; sound.tick(); }
+    const t = Math.min(1, (now - t0) / dur);
+    ballAngle = st + d * (1 - Math.pow(1 - t, 3));
+    const r = outerR - (outerR - innerR) * Math.pow(t, 1.6);   // spins out on the purple ring, then drifts inward
+    ball = { a: ballAngle, r };
+    drawWheel();
     if (t < 1) return requestAnimationFrame(f);
-    ballAngle %= TAU; ball = ballAngle; drawRR(); resolve(COLORS[w]);
+    ballAngle %= TAU; resolveSpin(winner);
   })(t0);
 };
 
-/* Rules:
-   bet red   -> safe on red or green      bet black -> safe on black or green
-   bet green -> safe only on green (and wins a PRIZE + picks the next player's color)
-   landing on green (any bet) -> that player sits out the next 2 games */
-function resolve(landed) {
-  const p = players[turn], last = turn === players.length - 1;
-  const safe = bet === 'green' ? landed === 'green' : (landed === bet || landed === 'green');
-  const prize = bet === 'green' && landed === 'green';
-  p.green = landed === 'green';
-  p.status = !safe ? 'out' : prize ? 'prize' : 'safe';
-  $('go').disabled = false; show('go', false); render();
+function resolveSpin(winner) {
+  const p = players[turn];
+  const c = colorOf(winner), parity = winner === 0 ? null : (winner % 2 ? 'odd' : 'even');
+  p.landedColor = c; p.landedParity = parity; p.happyGain = 0;
 
-  sound.land();                                                       // ball drops into the slot...
-  setTimeout(() => (prize ? sound.prize() : safe ? sound.win() : sound.lose()), 350);   // ...then the result sound
+  // Special case: 0 / green has no odd-or-even, so parity never applies when it comes up.
+  if (c === 'green') {
+    if (p.colorBet === 'green') {
+      p.happyGain = 10;
+      $('bettingMsg').innerHTML = 'The ball landed on <b>0</b> (' + colorSpan('green') + ')! You called it — automatic win. 😄×10';
+      finalize(true, false);
+    } else {
+      p.happyGain = 5;
+      $('bettingMsg').innerHTML = 'The ball landed on <b>0</b> (' + colorSpan('green') + '). Your odd/even bet doesn\u2019t apply here, ' +
+        'and your color bet missed — but landing on green earns a bonus. 😄×5';
+      finalize(false, false);
+    }
+    return;
+  }
 
-  let m = 'It landed on ' + cs(landed) + '. ';
-  if (!safe) m += 'Player ' + (turn + 1) + ' is out.';
-  else if (prize) m += 'PRIZE! Player ' + (turn + 1) + ' is safe.' + (last ? '' : " Pick the next player's color.");
-  else m += 'Player ' + (turn + 1) + ' is safe.' + (p.green ? ' (Green by luck)' : '');
-  if (p.green) m += ' Sits out 2 rounds.';
-  $('msg2').innerHTML = m;
-  if (prize && !last) show('colorRow', true); else show('nextTurn', true);
+  const hits = (p.colorBet === c ? 1 : 0) + (p.parityBet === parity ? 1 : 0);
+  $('bettingMsg').innerHTML = 'The ball landed on <b>' + winner + '</b> (' + colorSpan(c) + ', ' +
+    parity + '). You guessed ' + hits + ' of 2 correctly.';
+
+  if (hits === 2) {
+    finalize(true, false);
+  } else if (!settings.askQuestions) {
+    finalize(false, false);
+  } else {
+    p.status = 'pending';   // 0 or 1 correct guess -> answers a question later, once everyone has spun
+    p.hitCount = hits;      // used to pick how hard that question will be
+    renderSeats();
+    show('spinWheel', false);
+    show('nextTurn', true);
+    setNextLabel();
+  }
 }
 
-$('nextTurn').onclick = () => { turn++; turn < players.length ? beginTurn() : finish(); };
-
-function finish() {
-  show('nextTurn', false);
-  $('turnTitle').textContent = 'Game over'; $('msg2').textContent = '';
-  show('endBox', true); render();
-  $('summary').innerHTML = players.map((p, i) =>
-    'Player ' + (i + 1) + ' (#' + p.num + '): ' + LABEL[p.status] + (p.green ? ' · sits out 2 rounds' : '')).join('<br>');
+/* ---- label the NEXT TURN button with who (or what) comes next ---- */
+function setNextLabel() {
+  const btn = $('nextTurn');
+  if (phase === 'spin') {
+    btn.textContent = (turn + 1 < players.length) ? "CONTINUE: " + players[turn + 1].name : "LET'S CONTINUE WITH THE QUESTIONS";
+  } else {
+    btn.textContent = (qIndex + 1 < pendingList.length) ? "CONTINUE: " + players[pendingList[qIndex + 1]].name : 'SEE RESULTS';
+  }
 }
 
-$('newGame').onclick = () => {
-  Object.keys(banned).forEach(k => { if (--banned[k] <= 0) delete banned[k]; });   // one round has passed
-  players.forEach(p => { if (p.green) banned[p.num] = 2; });                        // green landers sit out 2 rounds
-  chosen = []; nSpins = 0; resetPicks(); banText(); ball = null; drawRR();
-  $('msg1').textContent = 'Spin 1 of 3'; $('spin').textContent = 'SPIN';
-  show('phase2', false); show('phase1', true);
+/* ---------- after every player has bet & spun, go through pending players' questions ---------- */
+function startQuestionPhase() {
+  pendingList = players.map((p, i) => i).filter(i => players[i].status === 'pending');
+  if (pendingList.length === 0) return finishGame();
+  phase = 'question'; qIndex = 0; beginQuestionTurn();
+}
+function beginQuestionTurn() {
+  turn = pendingList[qIndex];
+  renderSeats();
+  const p = players[turn];
+  $('turnTitle').textContent = p.name + ": answer to be safe";
+  ['betRow','spinWheel','questionBox','nextTurn','endBox'].forEach(id => show(id, false));
+  show('wheelbox', false);
+  $('bettingMsg').textContent = (p.hitCount === 1 ? 'One correct guess! ' : 'No correct guesses — tougher odds. ') + "Let\u2019s see what question comes up...";
+  show('slotStage', true); show('fireFx', false);
+  runDifficultyThenCategory();
+}
+
+/* ---------- difficulty + category slot machine ----------
+   One correct guess  -> uses the odds configured in Settings (easy/medium favored by default).
+   Zero correct guesses -> harder: the easy/hard odds are swapped, so medium and hard become the likely outcomes. */
+function weightedPick(weights) {
+  const total = weights.easy + weights.medium + weights.hard;
+  let r = Math.random() * total;
+  if ((r -= weights.easy) < 0) return 'easy';
+  if ((r -= weights.medium) < 0) return 'medium';
+  return 'hard';
+}
+function runDifficultyThenCategory() {
+  const p = players[turn];
+  const o = settings.odds;
+  const weights = p.hitCount === 0 ? { easy: o.hard, medium: o.medium, hard: o.easy } : o;
+  const diffReel = $('difficultyReel');
+  let ticks = 0;
+  const diffPool = ['easy', 'medium', 'hard'];
+  const iv = setInterval(() => {
+    diffReel.textContent = diffPool[rnd(0, 2)].toUpperCase();
+    ticks++;
+    if (ticks > 16) {
+      clearInterval(iv);
+      const finalDiff = weightedPick(weights);
+      diffReel.textContent = finalDiff.toUpperCase();
+      show('fireFx', finalDiff === 'hard');
+      spinCategory(finalDiff);
+    }
+  }, 70);
+}
+function spinCategory(difficulty) {
+  const catReel = $('categoryReel');
+  const pool = [...settings.enabledCategories];
+  let ticks = 0;
+  const iv = setInterval(() => {
+    catReel.textContent = pool[rnd(0, pool.length - 1)];
+    ticks++;
+    if (ticks > 16) {
+      clearInterval(iv);
+      const finalCat = pool[rnd(0, pool.length - 1)];
+      catReel.textContent = finalCat;
+      setTimeout(() => askQuestion(finalCat, difficulty), 500);
+    }
+  }, 70);
+}
+
+/* ---------- question card ---------- */
+function askQuestion(category, difficulty) {
+  show('slotStage', false);
+  const pool = (QUESTIONS[category] && QUESTIONS[category][difficulty]) || [];
+  if (pool.length === 0) { finalize(true, true); return; }   // no question available -> treat as safe
+  const q = pool[rnd(0, pool.length - 1)];
+  show('questionBox', true);
+  $('qCatLabel').textContent = category + ' — ' + difficulty.toUpperCase();
+  $('qText').textContent = q.q;
+  const box = $('qOptions'); box.innerHTML = '';
+  q.options.forEach((opt, idx) => {
+    const btn = document.createElement('button');
+    btn.textContent = opt;
+    btn.onclick = () => {
+      [...box.children].forEach(b => b.disabled = true);
+      const ok = idx === q.correct;
+      btn.classList.add(ok ? 'correct' : 'wrong');
+      if (!ok) box.children[q.correct].classList.add('correct');
+      setTimeout(() => { show('questionBox', false); finalize(ok, true); }, 900);
+    };
+    box.appendChild(btn);
+  });
+}
+
+/* ---------- finalize the current player: update seat + Firebase history ---------- */
+function finalize(safe, answeredQuestion) {
+  const p = players[turn];
+  p.status = safe ? 'safe' : 'out';
+  renderSeats();
+
+  updateUserHistory(p.name, rec => {
+    if (safe) rec.wins++; else rec.losses++;
+    if (p.landedParity === 'odd') rec.winsOdd += safe ? 1 : 0;
+    if (p.landedParity === 'even') rec.winsEven += safe ? 1 : 0;
+    if (p.landedColor === 'red') rec.winsRed += safe ? 1 : 0;
+    if (p.landedColor === 'black') rec.winsBlack += safe ? 1 : 0;
+    if (p.landedColor === 'green') rec.winsGreen += safe ? 1 : 0;
+    if (p.happyGain) rec.happyFaces += p.happyGain;
+    if (answeredQuestion) { rec.questionsAnswered++; if (safe) rec.questionsCorrect++; }
+  });
+
+  show('spinWheel', false);
+  show('nextTurn', true);
+  setNextLabel();
+}
+
+$('nextTurn').onclick = () => {
+  if (phase === 'spin') {
+    turn++;
+    if (turn < players.length) beginSpinTurn(); else startQuestionPhase();
+  } else {
+    qIndex++;
+    if (qIndex < pendingList.length) beginQuestionTurn(); else finishGame();
+  }
 };
+
+function finishGame() {
+  show('nextTurn', false);
+  show('wheelbox', false);
+  $('turnTitle').textContent = 'Round summary';
+  $('bettingMsg').textContent = '';
+  $('summary').innerHTML = players.map(p =>
+    p.name + ': ' + ({safe:'SAFE', out:'OUT'}[p.status]) + (p.happyGain ? ' 😄×' + p.happyGain : '')).join('<br>');
+  show('endBox', true); renderSeats();
+}
+$('toSelect').onclick = () => { buildReels(); screen('selectScreen'); };
+$('toStart').onclick = () => screen('startScreen');
