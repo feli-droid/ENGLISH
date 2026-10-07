@@ -7,55 +7,133 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800&family=Oswald:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="diseño/style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <h1>Casino Night</h1>
-  <button class="sound" id="soundBtn" aria-pressed="true">Sound: ON</button>
 
-  <!-- PHASE 1: pick the 3 players -->
-  <section id="phase1">
-    <h2>Spin three times to pick the players</h2>
-    <div class="wheelbox">
-      <div class="pointer"></div>
-      <canvas id="numWheel" width="380" height="380"></canvas>
-      <div class="hub">GO</div>
-    </div>
-    <div class="panel"><div class="players" id="picks"></div></div>
-    <div class="note" id="banNote"></div>
-    <div class="msg" id="msg1" aria-live="polite">Spin 1 of 3</div>
-    <button class="gold" id="spin">SPIN</button>
-  </section>
+<!-- ============ START SCREEN ============ -->
+<section id="startScreen" class="screen">
+  <button id="gearBtn" class="gear" aria-label="Settings">⚙</button>
+  <div class="center-card">
+    <h1>Casino Night</h1>
+    <button class="gold" id="startBtn">START</button>
+    <button class="ghost" id="historyBtn">PLAYER HISTORY</button>
+  </div>
+</section>
 
-  <!-- PHASE 2: the color roulette -->
-  <section id="phase2" class="hidden">
-    <h2 id="turnTitle"></h2>
-    <div class="wheelbox">
-      <canvas id="rrWheel" width="380" height="380"></canvas>
+<!-- ============ HISTORY SCREEN ============ -->
+<section id="historyScreen" class="screen hidden">
+  <h2>🏆 Classification</h2>
+  <div class="panel">
+    <div class="table-wrap">
+      <table id="historyTable">
+        <thead>
+          <tr><th>Player</th><th>😄</th><th>Wins</th><th>Losses</th><th>Odd</th><th>Even</th><th>Red</th><th>Black</th><th>Green</th><th>Q. correct</th><th>Q. answered</th></tr>
+        </thead>
+        <tbody id="historyBody"></tbody>
+      </table>
     </div>
-    <div class="panel"><div class="players" id="status"></div></div>
-    <div class="msg" id="msg2" aria-live="polite"></div>
+  </div>
+  <div class="msg" id="historyMsg" aria-live="polite"></div>
+  <button class="ghost" id="backFromHistory">BACK</button>
+</section>
 
-    <div class="chips" id="betRow">
-      <button class="chip bet" data-c="red">RED</button>
-      <button class="chip bet" data-c="black">BLACK</button>
-      <button class="chip bet" data-c="green">GREEN</button>
-    </div>
-    <button class="gold hidden" id="go">SPIN</button>
-    <div class="chips hidden" id="colorRow">
-      <button class="chip pick" data-c="red">RED</button>
-      <button class="chip pick" data-c="black">BLACK</button>
-      <button class="chip pick" data-c="green">GREEN</button>
-    </div>
-    <button class="gold hidden" id="nextTurn">NEXT TURN</button>
-    <div class="hidden" id="endBox">
-      <div id="summary"></div>
-      <button class="gold" id="newGame">NEW GAME</button>
-    </div>
-  </section>
-</main>
+<!-- ============ SETTINGS SCREEN ============ -->
+<section id="settingsScreen" class="screen hidden">
+  <h2>Settings</h2>
+  <div class="panel settings-panel">
+    <h3>Number of players</h3>
+    <div class="count-grid" id="countGrid"></div>
 
-<script src="javascripts/script.js"></script>
+    <h3>Student names (one per line — needs at least as many as players selected above)</h3>
+    <textarea id="namesBox" class="names-box" rows="6" spellcheck="false"></textarea>
+    <p class="hint" id="namesHint"></p>
+
+    <label class="field toggle">
+      <span>Ask questions when a player misses one guess</span>
+      <input type="checkbox" id="askQuestions" checked>
+    </label>
+
+    <h3>Difficulty odds (%)</h3>
+    <label class="field"><span>Easy</span><input type="number" id="pEasy" min="0" max="100" value="45"></label>
+    <label class="field"><span>Medium</span><input type="number" id="pMedium" min="0" max="100" value="40"></label>
+    <label class="field"><span>Hard</span><input type="number" id="pHard" min="0" max="100" value="15"></label>
+    <p class="hint" id="oddsHint"></p>
+
+    <h3>Categories for losers' questions</h3>
+    <div class="cat-list" id="catList"></div>
+
+    <button class="gold" id="saveSettings">SAVE</button>
+    <button class="ghost" id="backFromSettings">BACK</button>
+  </div>
+</section>
+
+<!-- ============ PLAYER SELECTION (SLOT MACHINE) ============ -->
+<section id="selectScreen" class="screen hidden">
+  <h2>Pick the players</h2>
+  <div class="panel machine">
+    <div class="reels" id="reels"></div>
+  </div>
+  <div class="msg" id="selectMsg" aria-live="polite">Press SPIN to pick the players</div>
+  <button class="gold" id="spinReels">SPIN</button>
+</section>
+
+<!-- ============ ROULETTE SCREEN ============ -->
+<section id="rouletteScreen" class="screen hidden">
+  <h2 id="turnTitle"></h2>
+
+  <div class="wheelbox" id="wheelbox">
+    <canvas id="wheel" width="380" height="380"></canvas>
+  </div>
+
+  <div class="panel"><div class="players" id="status"></div></div>
+
+  <div class="msg" id="bettingMsg" aria-live="polite">Place your bets</div>
+
+  <div class="bets" id="betRow">
+    <div class="bet-group">
+      <span class="bet-label">Color</span>
+      <div class="chips">
+        <button class="chip bet-color" data-c="red">RED</button>
+        <button class="chip bet-color" data-c="black">BLACK</button>
+        <button class="chip bet-color" data-c="green">GREEN</button>
+      </div>
+    </div>
+    <div class="bet-group">
+      <span class="bet-label">Parity</span>
+      <div class="chips">
+        <button class="chip parity" data-p="odd">ODD</button>
+        <button class="chip parity" data-p="even">EVEN</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="gold hidden" id="spinWheel">SPIN</button>
+
+  <!-- difficulty / category slot machine -->
+  <div class="hidden" id="slotStage">
+    <div class="slot-reel" id="difficultyReel">?</div>
+    <div class="slot-reel" id="categoryReel">?</div>
+    <div class="fire hidden" id="fireFx">🔥🔥🔥</div>
+  </div>
+
+  <!-- question card -->
+  <div class="hidden" id="questionBox">
+    <p class="qcat" id="qCatLabel"></p>
+    <p class="qtext" id="qText"></p>
+    <div class="qoptions" id="qOptions"></div>
+  </div>
+
+  <button class="gold hidden" id="nextTurn">NEXT TURN</button>
+
+  <div class="hidden" id="endBox">
+    <h3>Round summary</h3>
+    <div id="summary"></div>
+    <button class="gold" id="toSelect">PICK PLAYERS AGAIN</button>
+    <button class="ghost" id="toStart">BACK TO START</button>
+  </div>
+</section>
+
+<script src="script.js"></script>
 </body>
 </html>
