@@ -6,7 +6,8 @@
 *{box-sizing:border-box}
 body{
   margin:0; min-height:100vh; display:flex; justify-content:center; color:var(--text);
-  font-family:"Oswald","Arial Narrow",sans-serif; letter-spacing:.5px; position:relative; overflow-x:hidden;
+  font-family:"VT323","Courier New",monospace; font-size:1.2rem; letter-spacing:.5px; position:relative; overflow-x:hidden;
+  image-rendering:pixelated;
   background:
     radial-gradient(circle at 20% 15%, rgba(226,185,59,.18), transparent 35%),
     radial-gradient(circle at 85% 20%, rgba(255,61,154,.16), transparent 35%),
@@ -14,7 +15,7 @@ body{
     radial-gradient(ellipse at 50% 30%, var(--felt) 0%, var(--felt-dark) 75%);
   background-size:200% 200%, 200% 200%, 200% 200%, 100% 100%;
   animation:bgdrift 14s ease-in-out infinite;
-  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:calc(110px + env(safe-area-inset-bottom,0px));
 }
 @keyframes bgdrift{
   0%{background-position:0% 0%,100% 0%,50% 100%,50% 50%}
@@ -33,77 +34,112 @@ body::before{
 .screen{width:100%; max-width:460px; padding:22px 14px 44px; position:relative; margin:0 auto}
 .hidden{display:none !important}
 
-h1{font-family:"Playfair Display",Georgia,serif; font-weight:800; font-size:2.3rem; text-align:center; margin:0 0 20px;
-  background:linear-gradient(#fff3b0,var(--gold) 55%,var(--gold-dark)); -webkit-background-clip:text; background-clip:text; color:transparent;
-  filter:drop-shadow(0 3px 0 #000); animation:glow 2.4s ease-in-out infinite}
-@keyframes glow{0%,100%{filter:drop-shadow(0 3px 0 #000) drop-shadow(0 0 6px rgba(226,185,59,.3))}50%{filter:drop-shadow(0 3px 0 #000) drop-shadow(0 0 22px rgba(226,185,59,.85))}}
+h1{font-family:"Press Start 2P",monospace; font-size:1.7rem; text-align:center; margin:0 0 20px; color:var(--gold);
+  text-shadow:3px 3px 0 #000, 6px 6px 0 var(--gold-dark); animation:pixelflicker 1.6s steps(2) infinite}
+@keyframes pixelflicker{0%,100%{text-shadow:3px 3px 0 #000,6px 6px 0 var(--gold-dark)}50%{text-shadow:3px 3px 0 #000,6px 6px 0 var(--gold-dark),0 0 12px var(--gold)}}
 @media (prefers-reduced-motion:reduce){h1{animation:none}}
-h2{font-family:"Playfair Display",Georgia,serif; text-align:center; color:var(--gold); font-size:1.2rem; margin:0 0 14px}
-h3{color:var(--gold); font-size:.85rem; margin:18px 0 8px; letter-spacing:1px}
+h2{font-family:"Press Start 2P",monospace; text-align:center; color:var(--gold); font-size:.95rem; margin:0 0 16px; line-height:1.6; text-shadow:2px 2px 0 #000}
+h3{font-family:"Press Start 2P",monospace; color:var(--gold); font-size:.65rem; margin:18px 0 10px; letter-spacing:1px; text-shadow:2px 2px 0 #000}
+
+/* ---- game select screen ---- */
+.game-pick{display:flex; flex-direction:column; gap:14px; align-items:center}
+.game-btn{font-size:1rem !important; padding:22px 10px !important}
+
+/* ---- blackjack ---- */
+.bj-hand{margin-bottom:16px}
+.bj-label{display:block; font:700 .7rem "Press Start 2P",monospace; color:var(--gold); text-shadow:2px 2px 0 #000; margin-bottom:8px; letter-spacing:1px}
+.bj-cards{display:flex; gap:8px; flex-wrap:wrap; min-height:96px}
+.bj-card{width:64px; height:92px; border-radius:4px; background:#fdf6e3; border:3px solid #000; box-shadow:3px 3px 0 #000;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; font:700 1.3rem "VT323",monospace; color:#000;
+  animation:cardDeal .3s ease}
+.bj-card.red{color:var(--red)}
+.bj-card.back{background:repeating-linear-gradient(45deg,var(--gold) 0 6px,var(--gold-dark) 6px 12px)}
+@keyframes cardDeal{from{transform:translateY(-16px) scale(.8); opacity:0} to{transform:none; opacity:1}}
+@media (prefers-reduced-motion:reduce){.bj-card{animation:none}}
+#bjActions .chip{width:96px; border-radius:0}
 
 /* ---- start screen ---- */
-#startScreen{display:flex; align-items:center; justify-content:center; min-height:100vh}
+#startScreen{display:flex; align-items:center; justify-content:center; min-height:calc(100vh - 110px)}
 .center-card{text-align:center}
-.gear{position:absolute; top:22px; right:18px; width:46px; height:46px; border-radius:50%; border:2px solid var(--gold);
-  background:rgba(0,0,0,.35); color:var(--gold); font-size:1.3rem; cursor:pointer}
+.gear{position:absolute; top:22px; right:18px; width:46px; height:46px; border-radius:0; border:3px solid var(--gold);
+  background:#000; color:var(--gold); font-size:1.3rem; cursor:pointer; box-shadow:3px 3px 0 #000}
 .gear:focus-visible{outline:3px solid #fff; outline-offset:3px}
+.sound-toggle{position:absolute; top:22px; left:18px; border:3px solid var(--gold); border-radius:0; background:#000; color:var(--gold);
+  font:700 .6rem "Press Start 2P",monospace; padding:10px 8px; cursor:pointer; box-shadow:3px 3px 0 #000}
+.sound-toggle:focus-visible{outline:3px solid #fff; outline-offset:3px}
 
-/* ---- buttons ---- */
-.gold{width:100%; padding:15px 10px; border:0; border-radius:12px; cursor:pointer; font:600 1.05rem "Oswald",sans-serif; letter-spacing:2px; color:#2a1d00;
-  background:linear-gradient(#fff3b0,var(--gold) 50%,var(--gold-dark)); box-shadow:0 5px 0 #4a3a08, 0 8px 14px rgba(0,0,0,.5); margin-top:14px}
-.gold:active:not(:disabled){transform:translateY(3px); box-shadow:0 2px 0 #4a3a08}
+/* ---- buttons: flat pixel-game tiles with a hard offset shadow, no blur ---- */
+.gold{width:100%; padding:15px 10px; border:3px solid #000; border-radius:0; cursor:pointer; font:700 .85rem "Press Start 2P",monospace;
+  letter-spacing:1px; color:#2a1d00; background:var(--gold); box-shadow:4px 4px 0 #000; margin-top:14px}
+.gold:active:not(:disabled){transform:translate(3px,3px); box-shadow:1px 1px 0 #000}
 .gold:disabled{filter:grayscale(1) brightness(.6); cursor:default}
-.ghost{width:100%; margin-top:10px; padding:12px; border-radius:12px; border:1px solid var(--gold); background:transparent; color:var(--gold); cursor:pointer; font:400 .9rem "Oswald",sans-serif}
+.ghost{width:100%; margin-top:10px; padding:12px; border-radius:0; border:3px solid var(--gold); background:#000; color:var(--gold);
+  cursor:pointer; font:700 .75rem "Press Start 2P",monospace; box-shadow:4px 4px 0 rgba(226,185,59,.3)}
+.ghost:active{transform:translate(3px,3px); box-shadow:none}
 .gold:focus-visible,.ghost:focus-visible,.chip:focus-visible{outline:3px solid #fff; outline-offset:3px}
 
 /* ---- panels ---- */
-.panel{margin-top:10px; padding:14px 12px; border-radius:16px; background:rgba(0,0,0,.28);
-  border:2px solid var(--gold); box-shadow:inset 0 0 0 4px rgba(0,0,0,.35), 0 6px 16px rgba(0,0,0,.4)}
+.panel{margin-top:10px; padding:14px 12px; border-radius:0; background:rgba(0,0,0,.4);
+  border:3px solid var(--gold); box-shadow:4px 4px 0 rgba(0,0,0,.5)}
 .settings-panel{display:flex; flex-direction:column}
 .field{display:flex; justify-content:space-between; align-items:center; gap:10px; font-size:.8rem; margin:8px 0}
 .field input[type=number]{width:70px; padding:6px; border-radius:6px; border:1px solid var(--gold); background:#1b1b1b; color:var(--text)}
 .field.toggle input{width:20px; height:20px}
 .hint{font-size:.7rem; color:#ffb3c0; min-height:1.4em; margin:0}
-.cat-list{display:flex; flex-direction:column; gap:6px; font-size:.78rem}
+.cat-list{display:flex; flex-direction:column; gap:6px; font-size:.9rem}
 .cat-list label{display:flex; gap:8px; align-items:center}
 
 .count-grid{display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin-bottom:4px}
-.count-btn{padding:12px 0; border-radius:10px; border:2px solid var(--gold); background:#1b1b1b; color:var(--text);
-  font:700 1rem "Oswald",sans-serif; cursor:pointer}
-.count-btn.selected{background:linear-gradient(#fff3b0,var(--gold) 60%,var(--gold-dark)); color:#2a1d00; box-shadow:0 0 14px rgba(226,185,59,.7)}
+.count-btn{padding:12px 0; border-radius:0; border:3px solid var(--gold); background:#1b1b1b; color:var(--text);
+  font:700 .8rem "Press Start 2P",monospace; cursor:pointer; box-shadow:3px 3px 0 #000}
+.count-btn.selected{background:var(--gold); color:#2a1d00; box-shadow:3px 3px 0 #000, 0 0 14px rgba(226,185,59,.7)}
 .count-btn:focus-visible{outline:3px solid #fff; outline-offset:2px}
 
-.names-box{width:100%; min-height:120px; padding:10px; border-radius:10px; border:1px solid var(--gold);
-  background:#1b1b1b; color:var(--text); font:400 .85rem "Oswald",sans-serif; resize:vertical}
+.names-box{width:100%; min-height:120px; padding:10px; border-radius:0; border:3px solid var(--gold);
+  background:#1b1b1b; color:var(--text); font:400 1.05rem "VT323",monospace; resize:vertical}
 
-/* ---- players / seats ---- */
-.players{display:flex; gap:6px; flex-wrap:wrap}
-.seat{flex:1 1 76px; text-align:center; padding:8px 4px; border-radius:10px; background:var(--wine); border:2px solid #7a2a3a; font-size:.68rem; line-height:1.3; transition:box-shadow .3s}
-.seat b{display:block; font-family:"Playfair Display",Georgia,serif; font-size:.95rem; color:var(--gold); word-break:break-word}
-.seat.current{outline:3px solid var(--gold); outline-offset:2px}
+/* ---- players / seats: a tidy grid instead of a ragged wrap ---- */
+.players{display:grid; grid-template-columns:repeat(auto-fill, minmax(78px,1fr)); gap:8px}
+.seat{flex:1 1 76px; text-align:center; padding:8px 4px; border-radius:0; background:var(--wine); border:3px solid #7a2a3a; font-size:.8rem; line-height:1.3; transition:box-shadow .3s}
+.seat b{display:block; font-family:"Press Start 2P",monospace; font-size:.68rem; line-height:1.5; color:var(--gold); word-break:break-word}
+.seat.current{outline:3px solid #fff; outline-offset:2px}
 
-/* glowing auras: yellow = pending (one correct guess), green = safe, red = out */
-.seat.pending{border-color:var(--gold); animation:auraYellow 1.1s ease-in-out infinite} .seat.pending span{color:var(--gold)}
-.seat.safe{border-color:var(--green); animation:auraGreen 1.1s ease-in-out infinite} .seat.safe span{color:var(--green)}
-.seat.out{opacity:.75; border-color:var(--red); animation:auraRed 1.1s ease-in-out infinite} .seat.out span{color:#ff6b6b}
-@keyframes auraYellow{0%,100%{box-shadow:0 0 6px 1px rgba(226,185,59,.5)}50%{box-shadow:0 0 18px 5px rgba(226,185,59,.9)}}
-@keyframes auraGreen{0%,100%{box-shadow:0 0 6px 1px rgba(34,180,90,.5)}50%{box-shadow:0 0 18px 5px rgba(34,180,90,.9)}}
-@keyframes auraRed{0%,100%{box-shadow:0 0 6px 1px rgba(198,40,40,.5)}50%{box-shadow:0 0 18px 5px rgba(198,40,40,.9)}}
-@media (prefers-reduced-motion:reduce){.seat.pending,.seat.safe,.seat.out{animation:none}}
+/* glowing pixel auras: yellow = one correct guess, red-pending = zero correct guesses, green = safe, red = out */
+.seat.pending{border-color:var(--gold); animation:auraYellow 1s steps(2) infinite} .seat.pending span{color:var(--gold)}
+.seat.pending-hard{border-color:var(--red); animation:auraRed 1s steps(2) infinite} .seat.pending-hard span{color:#ff8a8a}
+.seat.safe{border-color:var(--green); animation:auraGreen 1s steps(2) infinite} .seat.safe span{color:var(--green)}
+.seat.out{opacity:.75; border-color:var(--red); animation:auraRed 1s steps(2) infinite} .seat.out span{color:#ff6b6b}
+@keyframes auraYellow{0%,100%{box-shadow:0 0 0 2px rgba(226,185,59,.6)}50%{box-shadow:0 0 0 2px rgba(226,185,59,.6),0 0 14px 4px rgba(226,185,59,.8)}}
+@keyframes auraGreen{0%,100%{box-shadow:0 0 0 2px rgba(34,180,90,.6)}50%{box-shadow:0 0 0 2px rgba(34,180,90,.6),0 0 14px 4px rgba(34,180,90,.8)}}
+@keyframes auraRed{0%,100%{box-shadow:0 0 0 2px rgba(198,40,40,.6)}50%{box-shadow:0 0 0 2px rgba(198,40,40,.6),0 0 14px 4px rgba(198,40,40,.8)}}
+@media (prefers-reduced-motion:reduce){.seat.pending,.seat.pending-hard,.seat.safe,.seat.out{animation:none}}
 
-/* ---- slot machine cabinet + reels (player selection) ---- */
-.machine{position:relative; padding:22px 14px; background:linear-gradient(#2a0a0a,#160404);
-  border:4px solid var(--gold); box-shadow:inset 0 0 0 3px #000, 0 10px 24px rgba(0,0,0,.6), 0 0 30px rgba(226,185,59,.25)}
-.reels{display:flex; gap:10px; justify-content:center; flex-wrap:wrap}
+/* ---- player selection: one big name reveal at a time, then a final lineup ---- */
+.machine{position:relative; padding:28px 14px; background:#2a0a0a; border-radius:0; min-height:160px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px;
+  border:4px solid var(--gold); box-shadow:inset 0 0 0 3px #000, 6px 6px 0 rgba(0,0,0,.6)}
+.big-reveal{font:700 1.7rem "Press Start 2P",monospace; color:var(--gold); text-shadow:4px 4px 0 #000; text-align:center;
+  word-break:break-word; min-height:1.4em}
+.big-reveal.pop{animation:bigPop .4s steps(3)}
+@keyframes bigPop{0%{transform:scale(.3); opacity:0}60%{transform:scale(1.25); opacity:1}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.big-reveal.pop{animation:none}}
+.lineup{display:flex; flex-wrap:wrap; gap:10px; justify-content:center}
+.lineup .tag{padding:8px 12px; background:var(--gold); color:#2a1d00; border:3px solid #000; box-shadow:3px 3px 0 #000;
+  font:700 .65rem "Press Start 2P",monospace; opacity:0; animation:tagIn .3s ease forwards}
+@keyframes tagIn{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){.lineup .tag{animation:none; opacity:1}}
+
+/* ---- slot machine cabinet + reels (used by the difficulty/category stage) ---- */
+.reels{display:flex; flex-wrap:wrap; gap:10px 0; justify-content:space-between}
 .reel{
-  --ih:90px; width:104px; height:var(--ih); border-radius:10px; overflow:hidden; position:relative;
-  background:#0d0d0d; border:4px solid var(--gold); box-shadow:inset 0 10px 14px -6px rgba(0,0,0,.9), inset 0 -10px 14px -6px rgba(0,0,0,.9), 0 0 14px rgba(226,185,59,.5);
+  --ih:90px; width:104px; height:var(--ih); border-radius:0; overflow:hidden; position:relative;
+  background:#0d0d0d; border:4px solid var(--gold); box-shadow:inset 0 10px 0 -6px #000, inset 0 -10px 0 -6px #000, 3px 3px 0 #000;
 }
 .reel-strip{display:flex; flex-direction:column; will-change:transform}
 .reel-item{height:90px; padding:0 4px; text-align:center; display:flex; align-items:center; justify-content:center;
-  font:700 1.15rem "Oswald",sans-serif; color:var(--gold); text-shadow:0 0 10px rgba(226,185,59,.6); line-height:1.1; overflow-wrap:break-word}
-.reel::after{content:""; position:absolute; inset:0; pointer-events:none; border-radius:6px;
-  background:linear-gradient(rgba(255,255,255,.12),transparent 20%,transparent 80%,rgba(0,0,0,.5))}
+  font:700 .95rem "Press Start 2P",monospace; color:var(--gold); text-shadow:2px 2px 0 #000; line-height:1.3; overflow-wrap:break-word}
+.reel::after{content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(rgba(255,255,255,.1),transparent 20%,transparent 80%,rgba(0,0,0,.6))}
 
 /* ---- roulette wheel ---- */
 .wheelbox{position:relative; width:380px; max-width:100%; margin:0 auto; border-radius:50%;
@@ -115,40 +151,59 @@ h3{color:var(--gold); font-size:.85rem; margin:18px 0 8px; letter-spacing:1px}
 @media (prefers-reduced-motion:reduce){.wheelbox::before{animation:none}}
 canvas{display:block; width:100%; height:auto; border-radius:50%}
 
-.msg{min-height:3.4em; margin:14px 0 8px; text-align:center; font-size:.95rem; line-height:1.5}
+.msg{min-height:3.4em; margin:14px 0 8px; text-align:center; font-size:1.15rem; line-height:1.5}
 .r{color:#ff6b6b} .b{color:#cfcfcf} .g{color:var(--green)}
 
 .bets{display:flex; flex-direction:column; gap:10px}
 .bet-group{text-align:center}
-.bet-label{display:block; font-size:.7rem; color:var(--gold); letter-spacing:1px; margin-bottom:6px}
+.bet-label{display:block; font:700 .65rem "Press Start 2P",monospace; color:var(--gold); letter-spacing:1px; margin-bottom:8px}
 .chips{display:flex; justify-content:center; gap:10px}
-.chip{width:72px; height:72px; border-radius:50%; cursor:pointer; color:#fff; font:600 .75rem "Oswald",sans-serif; letter-spacing:1px;
-  border:4px dashed #fff; background:var(--c); box-shadow:0 5px 0 rgba(0,0,0,.55), inset 0 0 0 4px var(--c), inset 0 0 0 6px rgba(255,255,255,.5)}
+.chip{width:72px; height:72px; border-radius:0; cursor:pointer; color:#fff; font:700 .62rem "Press Start 2P",monospace; letter-spacing:0;
+  border:3px solid #000; background:var(--c); box-shadow:3px 3px 0 #000}
 .chip:disabled{filter:grayscale(.6) brightness(.7); cursor:default}
-.chip.selected{outline:3px solid #fff; outline-offset:3px}
+.chip.selected{outline:3px solid #fff; outline-offset:2px}
+.chip:active:not(:disabled){transform:translate(2px,2px); box-shadow:1px 1px 0 #000}
 .chip[data-c=red]{--c:var(--red)} .chip[data-c=black]{--c:var(--black)} .chip[data-c=green]{--c:var(--green)}
 .chip[data-p]{--c:#6a4fb0}
 
 /* ---- difficulty / category slot machine ---- */
 #slotStage{display:flex; gap:14px; justify-content:center; align-items:center; margin:18px 0; position:relative; flex-wrap:wrap}
-.slot-reel{min-width:150px; padding:20px 14px; text-align:center; border-radius:12px; background:#0d0d0d; border:4px solid var(--gold);
-  font:700 1.1rem "Oswald",sans-serif; color:var(--gold); text-shadow:0 0 8px rgba(226,185,59,.6);
-  box-shadow:inset 0 0 0 2px #000, 0 0 16px rgba(226,185,59,.4); animation:reelpulse 1s ease-in-out infinite}
-@keyframes reelpulse{0%,100%{box-shadow:inset 0 0 0 2px #000,0 0 10px rgba(226,185,59,.3)}50%{box-shadow:inset 0 0 0 2px #000,0 0 26px rgba(226,185,59,.8)}}
+.slot-reel{min-width:150px; padding:20px 14px; text-align:center; border-radius:0; background:#0d0d0d; border:4px solid var(--gold);
+  font:700 .8rem "Press Start 2P",monospace; color:var(--gold); text-shadow:2px 2px 0 #000;
+  box-shadow:4px 4px 0 #000; animation:reelpulse .9s steps(2) infinite}
+@keyframes reelpulse{0%,100%{box-shadow:4px 4px 0 #000}50%{box-shadow:4px 4px 0 #000,0 0 16px rgba(226,185,59,.8)}}
 .fire{position:absolute; top:-34px; left:50%; transform:translateX(-50%); font-size:2rem}
 @media (prefers-reduced-motion:reduce){.slot-reel{animation:none}}
 
+/* ---- big reveal banners (difficulty / category / "your question is") ---- */
+.reveal{text-align:center; font:700 1.1rem "Press Start 2P",monospace; color:var(--gold); margin:18px 0;
+  text-shadow:3px 3px 0 #000; animation:revealPop .4s steps(3)}
+@keyframes revealPop{0%{transform:scale(.4); opacity:0}60%{transform:scale(1.15); opacity:1}100%{transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.reveal{animation:none}}
+
 /* ---- question card ---- */
-#questionBox{margin-top:10px; padding:14px; border-radius:14px; background:rgba(0,0,0,.3); border:2px solid var(--gold)}
-.qcat{font-size:.7rem; color:var(--gold); letter-spacing:1px; margin:0 0 6px}
-.qtext{font-size:.95rem; line-height:1.5; margin:0 0 12px}
-.qoptions{display:flex; flex-direction:column; gap:8px}
-.qoptions button{padding:10px; border-radius:8px; border:1px solid var(--gold); background:rgba(255,255,255,.05); color:var(--text); cursor:pointer; text-align:left; font:400 .85rem "Oswald",sans-serif}
+#questionBox{margin-top:10px; padding:16px; border-radius:0; background:rgba(0,0,0,.4); border:3px solid var(--gold); box-shadow:4px 4px 0 rgba(0,0,0,.5)}
+.qtimer-wrap{position:relative; height:22px; background:#000; border:2px solid var(--gold); margin-bottom:14px; overflow:hidden}
+.qtimer-bar{position:absolute; inset:0; background:var(--green); width:100%; transition:width 1s linear, background .3s}
+.qtimer-bar.low{background:var(--red)}
+.qtimer-num{position:relative; z-index:1; display:block; text-align:center; line-height:22px; font:700 .75rem "Press Start 2P",monospace; color:#fff; text-shadow:1px 1px 0 #000}
+.qcat{font:700 .65rem "Press Start 2P",monospace; color:var(--gold); letter-spacing:1px; margin:0 0 10px}
+.qtext{font-size:1.3rem; line-height:1.4; margin:0 0 14px}
+.qoptions{display:flex; flex-direction:column; gap:10px}
+.qoptions button{padding:12px; border-radius:0; border:2px solid var(--gold); background:rgba(255,255,255,.05); color:var(--text);
+  cursor:pointer; text-align:left; font:400 1.1rem "VT323",monospace; opacity:0; animation:optIn .35s ease forwards}
+.qoptions button:nth-child(1){animation-delay:.05s} .qoptions button:nth-child(2){animation-delay:.25s}
+.qoptions button:nth-child(3){animation-delay:.45s} .qoptions button:nth-child(4){animation-delay:.65s}
+@keyframes optIn{from{opacity:0; transform:translateX(-12px)} to{opacity:1; transform:translateX(0)}}
 .qoptions button.correct{background:rgba(34,180,90,.35); border-color:var(--green)}
 .qoptions button.wrong{background:rgba(198,40,40,.35); border-color:var(--red)}
 .qoptions button:disabled{cursor:default}
 
-#summary{text-align:center; line-height:2; margin:10px 0 14px; font-size:.95rem}
+#summary{text-align:left; line-height:1.6; margin:10px 0 14px; font-size:1.05rem}
+.result-card{border:2px solid var(--gold); padding:10px 12px; margin-bottom:10px; background:rgba(0,0,0,.25)}
+.result-card b{font-family:"Press Start 2P",monospace; font-size:.75rem; color:var(--gold); display:block; margin-bottom:6px}
+.result-card.safe{border-color:var(--green)} .result-card.out{border-color:var(--red)}
+.result-line{font-size:.95rem; color:#cfe8d8}
 
 /* =========================================================
    Desktop / wide-screen layout — the rules above are mobile-first;
@@ -156,33 +211,47 @@ canvas{display:block; width:100%; height:auto; border-radius:50%}
    stranded in the middle of a big screen.
    ========================================================= */
 @media (min-width:700px){
-  .screen{max-width:680px; padding:34px 28px 60px}
-  h1{font-size:2.8rem}
-  .wheelbox{width:460px}
-  .reel{width:124px}                 /* wider, not taller — height stays in sync with the JS scroll math */
-  .reel-item{font-size:1.5rem}
-  .machine{padding:30px 22px}
-  .slot-reel{min-width:190px; padding:26px 18px; font-size:1.25rem}
+  .screen{max-width:780px; padding:34px 28px 70px}
+  h1{font-size:2.3rem}
+  .wheelbox{width:420px}
+  .machine{padding:46px 30px; min-height:220px}
+  .big-reveal{font-size:2.6rem}
+  .slot-reel{min-width:190px; padding:26px 18px; font-size:.95rem}
   .fire{font-size:2.6rem; top:-42px}
-  .chip{width:96px; height:96px; font-size:.9rem}
+  .chip{width:92px; height:92px; font-size:.68rem}
   .count-grid{grid-template-columns:repeat(10,1fr)}
-  .players{gap:12px}
-  .seat{font-size:.82rem; padding:12px 6px}
-  .seat b{font-size:1.1rem}
-  #historyTable{font-size:.82rem}
+  .players{grid-template-columns:repeat(auto-fill, minmax(96px,1fr))}
+  .seat{font-size:.9rem; padding:12px 8px}
+  .seat b{font-size:.78rem}
+  #historyTable{font-size:.95rem}
   #historyTable th,#historyTable td{padding:10px 14px}
+  .game-pick{flex-direction:row}
+  .bj-card{width:76px; height:108px; font-size:1.5rem}
+
+  /* settings: just give it room to breathe (see max-width on #settingsScreen below) */
+  .names-box{min-height:140px}
+
+  /* roulette/blackjack screen: game area on the left, players as a side list on the right */
+  #rouletteScreen{display:grid; grid-template-columns:1fr 260px; gap:0 28px; align-items:start}
+  #rouletteScreen h2, #rouletteScreen .msg, #rouletteScreen .bets, #rouletteScreen #spinWheel,
+  #rouletteScreen #slotStage, #rouletteScreen .reveal, #rouletteScreen #questionBox,
+  #rouletteScreen #nextTurn, #rouletteScreen #endBox, #rouletteScreen #rouletteArea, #rouletteScreen #blackjackArea{ grid-column:1 }
+  #rouletteScreen .panel:has(.players){grid-column:2; grid-row:1/9; margin-top:0; max-height:80vh; overflow-y:auto}
+  #rouletteScreen .players{grid-template-columns:1fr}
 }
 @media (min-width:1050px){
   #historyScreen.screen{max-width:1100px}   /* the classification table gets real room instead of a scrollbar */
-  #settingsScreen.screen{max-width:760px}
+  #settingsScreen.screen{max-width:860px}
+  .bj-card{width:84px; height:118px; font-size:1.65rem}
+  .big-reveal{font-size:3.2rem}
 }
 
 /* ---- classification / history table ---- */
-.table-wrap{overflow-x:auto; border-radius:10px; box-shadow:0 0 18px rgba(226,185,59,.3)}
-#historyTable{border-collapse:collapse; width:100%; font-size:.72rem; white-space:nowrap}
-#historyTable th,#historyTable td{padding:8px 10px; text-align:center; border-bottom:1px solid rgba(226,185,59,.25)}
-#historyTable th{color:#2a1d00; font-weight:700; position:sticky; top:0;
-  background:linear-gradient(#fff3b0,var(--gold) 70%); text-shadow:none; letter-spacing:.5px}
+.table-wrap{overflow-x:auto; border-radius:0; box-shadow:4px 4px 0 rgba(0,0,0,.5)}
+#historyTable{border-collapse:collapse; width:100%; font-size:1rem; white-space:nowrap}
+#historyTable th,#historyTable td{padding:8px 10px; text-align:center; border-bottom:2px solid rgba(226,185,59,.4)}
+#historyTable th{color:#2a1d00; font:700 .6rem "Press Start 2P",monospace; position:sticky; top:0;
+  background:var(--gold); text-shadow:none; letter-spacing:.5px}
 #historyTable td:first-child,#historyTable th:first-child{font-weight:700; position:sticky; left:0}
 #historyTable td:first-child{color:var(--gold); background:#0d2a1d}
 #historyTable th:first-child{background:var(--gold-dark)}
@@ -190,3 +259,192 @@ canvas{display:block; width:100%; height:auto; border-radius:50%}
 #historyTable td:nth-child(2){color:var(--gold); font-weight:700}
 #historyTable tbody tr.top-player{background:rgba(226,185,59,.18)}
 #historyTable tbody tr.top-player td:first-child{text-shadow:0 0 8px var(--gold)}
+
+
+/* =========================================================
+   V2 — bigger player reveal, tidy player grid, true desktop
+   layout, side decorations and the pixel walker
+   ========================================================= */
+
+/* subtle felt diamonds so large screens never look empty */
+body::after{content:""; position:fixed; inset:0; z-index:0; pointer-events:none; opacity:.9;
+  background-image:linear-gradient(45deg,rgba(255,255,255,.028) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.028) 75%),
+                   linear-gradient(45deg,rgba(255,255,255,.028) 25%,transparent 25%,transparent 75%,rgba(255,255,255,.028) 75%);
+  background-size:56px 56px; background-position:0 0,28px 28px}
+.screen{z-index:1}
+
+/* ---- player selection: a real stage ---- */
+#selectScreen{display:flex; flex-direction:column}
+.machine{min-height:min(60vh,520px); padding:28px 14px; gap:22px; position:relative; overflow:hidden;
+  background:radial-gradient(circle at 50% 45%, #5a1313 0%, #2a0a0a 70%)}
+.machine::before{content:""; position:absolute; inset:0; pointer-events:none; opacity:.35;
+  background:repeating-conic-gradient(from 0deg at 50% 50%, rgba(226,185,59,.35) 0 6deg, transparent 6deg 18deg);
+  animation:rays 14s linear infinite}
+@keyframes rays{to{transform:rotate(360deg)}}
+.machine > *{position:relative; z-index:1}
+.pick-counter{font:700 .8rem "Press Start 2P",monospace; color:#fff; background:#000; border:3px solid var(--gold);
+  padding:8px 14px; box-shadow:3px 3px 0 #000}
+.big-reveal{font-size:clamp(2rem,11vw,4.2rem); line-height:1.3; min-height:1.4em; width:100%; padding:0 6px;
+  display:flex; align-items:center; justify-content:center; text-shadow:5px 5px 0 #000}
+.big-reveal.locked{color:#fff; text-shadow:5px 5px 0 var(--gold-dark),0 0 28px var(--gold)}
+.big-reveal.pop{animation:bigPop .45s steps(4)}
+
+/* final lineup: numbered cards in an even grid */
+.lineup{display:grid; grid-template-columns:repeat(2,1fr); gap:12px; width:100%; max-width:900px}
+.lineup .tag{display:flex; align-items:center; gap:10px; padding:12px 12px; min-height:62px; background:var(--gold); color:#2a1d00;
+  border:3px solid #000; box-shadow:4px 4px 0 #000; font:700 .7rem "Press Start 2P",monospace; line-height:1.4; word-break:break-word}
+.lineup .tag i{font-style:normal; flex:0 0 auto; min-width:30px; height:30px; display:flex; align-items:center; justify-content:center;
+  background:#000; color:var(--gold); border:2px solid #000; font-size:.6rem}
+.lineup .tag span{flex:1; text-align:left}
+@media (min-width:700px){
+  .lineup{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
+  .lineup .tag{font-size:.8rem; padding:16px}
+}
+
+/* ---- players in the game: numbered cards, never one long column ---- */
+.players-panel h3{margin:0 0 10px; text-align:center}
+.players{grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); gap:8px}
+.seat{position:relative; padding:18px 6px 8px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-height:74px}
+.seat .n{position:absolute; top:-3px; left:-3px; min-width:22px; height:22px; padding:0 4px; display:flex; align-items:center; justify-content:center;
+  font:700 .55rem "Press Start 2P",monospace; font-style:normal; background:#000; color:var(--gold); border:2px solid var(--gold)}
+.seat b{font-size:.62rem}
+.seat span{font:700 .6rem "Press Start 2P",monospace}
+
+/* ---- results as a grid ---- */
+#summary{display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:10px}
+.result-card{margin-bottom:0}
+
+/* ---- settings in two columns on wide screens ---- */
+.settings-grid{display:grid; grid-template-columns:1fr; gap:0 30px}
+.settings-col{display:flex; flex-direction:column; min-width:0}
+.settings-col > h3:first-child{margin-top:6px}
+
+/* ---- side decorations ---- */
+.deco{display:none; position:fixed; top:40px; bottom:100px; width:70px; z-index:1; pointer-events:none;
+  flex-direction:column; justify-content:space-around; align-items:center; font-size:2.2rem; filter:drop-shadow(3px 3px 0 #000)}
+.deco-l{left:max(8px,calc((100vw - 1120px)/4 - 35px))} .deco-r{right:max(8px,calc((100vw - 1120px)/4 - 35px))}
+.deco span{animation:floaty 3s steps(6) infinite} .deco span:nth-child(even){animation-delay:-1.5s}
+@keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+@media (prefers-reduced-motion:reduce){.deco span{animation:none}}
+@media (min-width:1280px){.deco{display:flex}}
+
+/* ---- pixel walker: A -> B -> A along a little street ---- */
+.walk-bar{position:fixed; left:0; right:0; bottom:0; height:78px; z-index:4; pointer-events:none;
+  background:linear-gradient(transparent,rgba(0,0,0,.55)); padding-bottom:env(safe-area-inset-bottom,0px)}
+.ground{position:absolute; left:0; right:0; bottom:0; height:16px; border-top:4px solid #000;
+  background:repeating-linear-gradient(90deg,#7a4a22 0 28px,#5e3717 28px 32px)}
+.flag{position:absolute; bottom:16px; width:36px; height:54px}
+.flag-a{left:10px} .flag-b{right:10px}
+.flag i{position:absolute; left:4px; bottom:0; width:4px; height:54px; background:#ddd; border:1px solid #000}
+.flag b{position:absolute; left:8px; top:2px; width:26px; height:22px; display:flex; align-items:center; justify-content:center;
+  font:700 .6rem "Press Start 2P",monospace; color:#fff; border:2px solid #000; animation:flagwave .8s steps(2) infinite}
+.flag-a b{background:var(--green)} .flag-b b{background:var(--red)}
+@keyframes flagwave{0%,100%{transform:skewY(0)}50%{transform:skewY(-8deg)}}
+.walker{position:absolute; bottom:16px; left:56px; width:40px; height:56px; animation:walkAB 18s linear infinite}
+.walker-flip{width:40px; height:56px; position:relative; animation:faceDir 18s step-end infinite; transform-origin:50% 50%}
+.walker .frame{position:absolute; left:0; bottom:0; shape-rendering:crispEdges; filter:drop-shadow(2px 2px 0 rgba(0,0,0,.6))}
+.walker .f1{animation:step1 .5s steps(1) infinite} .walker .f2{animation:step2 .5s steps(1) infinite}
+@keyframes step1{0%{opacity:1}50%{opacity:0}100%{opacity:1}}
+@keyframes step2{0%{opacity:0}50%{opacity:1}100%{opacity:0}}
+@keyframes walkAB{0%{left:56px} 46%{left:calc(100% - 96px)} 50%{left:calc(100% - 96px)} 96%{left:56px} 100%{left:56px}}
+@keyframes faceDir{0%{transform:scaleX(1)} 48%{transform:scaleX(-1)} 98%{transform:scaleX(1)}}
+@media (prefers-reduced-motion:reduce){.walker,.walker-flip,.walker .f1,.walker .f2,.flag b{animation:none} .walker .f2{opacity:0}}
+
+/* =========================================================
+   Desktop: use the whole screen instead of a phone column
+   ========================================================= */
+@media (min-width:700px){
+  .screen{max-width:960px; padding:36px 28px 40px}
+  h2{font-size:1.3rem; margin-bottom:22px}
+  h3{font-size:.75rem}
+  .machine{padding:44px 30px}
+  .field{font-size:1rem}
+  .field input[type=number]{width:90px; padding:8px; font-size:1rem}
+  .cat-list{font-size:1.05rem}
+  .names-box{min-height:170px; font-size:1.2rem}
+  .msg{font-size:1.4rem}
+  .qtext{font-size:1.6rem}
+  .qoptions{display:grid; grid-template-columns:1fr 1fr}
+  .qoptions button{font-size:1.3rem; padding:16px}
+  #questionBox{padding:24px}
+  .gold{font-size:1rem; padding:18px 12px}
+  .ghost{font-size:.85rem; padding:15px}
+  #startScreen .center-card{width:min(520px,100%)}
+  #startScreen h1{font-size:2.8rem; margin-bottom:34px}
+  .slot-reel{font-size:1.1rem}
+  .reveal{font-size:1.7rem}
+  .seat b{font-size:.72rem}
+  .seat span{font-size:.65rem}
+  .bj-card{width:84px; height:118px}
+}
+@media (min-width:1050px){
+  .screen{max-width:1120px}
+  #rouletteScreen{grid-template-columns:minmax(0,1fr) 340px; gap:0 32px}
+  #rouletteScreen .panel:has(.players){grid-row:1/12; position:sticky; top:20px; max-height:calc(100vh - 130px)}
+  #rouletteScreen .players{grid-template-columns:repeat(2,1fr)}
+  .wheelbox{width:min(480px,calc(100vh - 470px)); min-width:300px}
+  #settingsScreen.screen{max-width:1000px}
+  .settings-grid{grid-template-columns:1fr 1fr}
+  #historyScreen.screen{max-width:1120px}
+  .machine{min-height:min(56vh,540px)}
+  .big-reveal{font-size:clamp(3rem,7vw,6.5rem)}
+}
+@media (min-width:700px) and (max-width:1049px){
+  .players{grid-template-columns:repeat(auto-fill,minmax(130px,1fr))}
+  #rouletteScreen{display:block}
+}
+@media (max-width:420px){
+  .chip{width:64px; height:64px}
+  h1{font-size:1.35rem}
+}
+
+
+/* ---- walker v3: video character, no flags ---- */
+.walk-bar{height:100px}
+.walker{bottom:14px; width:86px; height:86px}
+.walker-flip{width:86px; height:86px}
+.walker-vid{position:absolute; left:0; bottom:0; width:86px; height:86px; object-fit:contain; filter:drop-shadow(2px 2px 0 rgba(0,0,0,.6))}
+.walker-fallback{display:none; position:absolute; left:0; bottom:0}
+.walker.use-sprite .walker-vid{display:none}
+.walker.use-sprite .walker-fallback{display:block}
+.walker-fallback .frame{position:absolute; left:15px; bottom:0}
+.flag{display:none}
+@keyframes walkAB{0%{left:24px} 47%{left:calc(100% - 110px)} 50%{left:calc(100% - 110px)} 97%{left:24px} 100%{left:24px}}
+
+/* ---- classification: "Result" button + detail row ---- */
+.qbtn{width:34px; height:34px; border:3px solid #000; background:var(--gold); color:#2a1d00; font:700 .8rem "Press Start 2P",monospace;
+  cursor:pointer; box-shadow:2px 2px 0 #000}
+.qbtn:active{transform:translate(2px,2px); box-shadow:none}
+.qbtn:focus-visible{outline:3px solid #fff; outline-offset:2px}
+#historyTable tr.detail > td{white-space:normal; text-align:left; background:rgba(0,0,0,.45); padding:14px;
+  border-bottom:3px solid var(--gold)}
+#historyTable tr.detail td:first-child{position:static; background:rgba(0,0,0,.45); font-weight:400}
+#historyTable tr.detail.hidden{display:none}
+.rbox{display:inline-block; vertical-align:top; min-width:260px; margin:0 18px 8px 0}
+.rbox h4{font:700 .65rem "Press Start 2P",monospace; color:var(--gold); margin:0 0 10px; text-shadow:2px 2px 0 #000}
+.rgrid{display:flex; flex-wrap:wrap; gap:8px}
+.rchip{display:flex; flex-direction:column; gap:4px; min-width:76px; padding:6px 8px; background:rgba(255,255,255,.06); border:2px solid var(--gold); text-align:center}
+.rchip span{font:700 .5rem "Press Start 2P",monospace; color:var(--gold)}
+.rchip b{font-size:1rem; font-weight:400} .rchip .ok{color:#6fe09a} .rchip .no{color:#ff8a8a}
+.rnote{font-size:.9rem; color:#cfe8d8; margin-top:6px}
+
+
+/* ---- walker v4: pixel gambler, 4-frame cycle, no video ---- */
+.walker{width:48px; height:70px; bottom:14px}
+.walker-flip{width:48px; height:70px; animation:faceDir 18s step-end infinite}
+.walker .frame{position:absolute; left:0; bottom:0; opacity:0; filter:drop-shadow(2px 2px 0 rgba(0,0,0,.6))}
+.walker .f1{animation:wf1 .72s steps(1) infinite} .walker .f2{animation:wf2 .72s steps(1) infinite}
+.walker .f3{animation:wf3 .72s steps(1) infinite} .walker .f4{animation:wf4 .72s steps(1) infinite}
+@keyframes wf1{0%{opacity:1}25%,100%{opacity:0}}
+@keyframes wf2{0%,25%{opacity:0}25.01%{opacity:1}50%,100%{opacity:0}}
+@keyframes wf3{0%,50%{opacity:0}50.01%{opacity:1}75%,100%{opacity:0}}
+@keyframes wf4{0%,75%{opacity:0}75.01%{opacity:1}100%{opacity:1}}
+@keyframes walkAB{0%{left:24px} 47%{left:calc(100% - 76px)} 50%{left:calc(100% - 76px)} 97%{left:24px} 100%{left:24px}}
+@media (prefers-reduced-motion:reduce){.walker .f1{animation:none; opacity:1}.walker .f2,.walker .f3,.walker .f4{animation:none; opacity:0}}
+
+/* ---- clickable side decorations that bounce around the screen ---- */
+.deco span{pointer-events:auto; cursor:pointer; user-select:none; transition:filter .15s}
+.deco span:hover{filter:brightness(1.3) drop-shadow(0 0 8px var(--gold))}
+.deco span.away{visibility:hidden}
+.bouncer{position:fixed; left:0; top:0; z-index:50; font-size:2.2rem; line-height:1; cursor:pointer; user-select:none;
+  filter:drop-shadow(3px 3px 0 #000); will-change:transform}
