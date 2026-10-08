@@ -6,19 +6,41 @@
 <title>Casino Night</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800&family=Oswald:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="diseño/style.css">
 </head>
 <body>
 
+<!-- side decorations (only on wide screens) -->
+<div class="deco deco-l" aria-hidden="true"><span>🎰</span><span>🃏</span><span>💎</span><span>🍒</span><span>🎲</span></div>
+<div class="deco deco-r" aria-hidden="true"><span>🎲</span><span>7️⃣</span><span>🪙</span><span>🃏</span><span>🎰</span></div>
+
+<!-- walker: a little gambler strolling from one side to the other and back -->
+<div class="walk-bar" aria-hidden="true">
+  <div class="walker"><div class="walker-flip" id="walkerSprite"></div></div>
+  <div class="ground"></div>
+</div>
+</div>
+
 <!-- ============ START SCREEN ============ -->
 <section id="startScreen" class="screen">
+  <button id="soundBtn" class="sound-toggle" aria-pressed="true">🔊 SOUND: ON</button>
   <button id="gearBtn" class="gear" aria-label="Settings">⚙</button>
   <div class="center-card">
     <h1>Casino Night</h1>
     <button class="gold" id="startBtn">START</button>
     <button class="ghost" id="historyBtn">PLAYER HISTORY</button>
   </div>
+</section>
+
+<!-- ============ GAME SELECT SCREEN (only shown when both games are enabled) ============ -->
+<section id="gameSelectScreen" class="screen hidden">
+  <h2>Choose your game</h2>
+  <div class="panel game-pick">
+    <button class="gold game-btn" id="pickRoulette">🎡 ROULETTE</button>
+    <button class="gold game-btn" id="pickBlackjack">🃏 BLACKJACK</button>
+  </div>
+  <button class="ghost" id="backFromGameSelect">BACK</button>
 </section>
 
 <!-- ============ HISTORY SCREEN ============ -->
@@ -28,7 +50,7 @@
     <div class="table-wrap">
       <table id="historyTable">
         <thead>
-          <tr><th>Player</th><th>😄</th><th>Wins</th><th>Losses</th><th>Odd</th><th>Even</th><th>Red</th><th>Black</th><th>Green</th><th>Q. correct</th><th>Q. answered</th></tr>
+          <tr><th>Player</th><th>😄</th><th>Wins</th><th>Losses</th><th>Result</th><th>Q. correct</th><th>Q. answered</th></tr>
         </thead>
         <tbody id="historyBody"></tbody>
       </table>
@@ -41,7 +63,7 @@
 <!-- ============ SETTINGS SCREEN ============ -->
 <section id="settingsScreen" class="screen hidden">
   <h2>Settings</h2>
-  <div class="panel settings-panel">
+  <div class="panel settings-panel"><div class="settings-grid"><div class="settings-col">
     <h3>Number of players</h3>
     <div class="count-grid" id="countGrid"></div>
 
@@ -49,11 +71,19 @@
     <textarea id="namesBox" class="names-box" rows="6" spellcheck="false"></textarea>
     <p class="hint" id="namesHint"></p>
 
+    <h3>Available games</h3>
+    <div class="cat-list">
+      <label><input type="checkbox" id="gameRoulette" checked> Roulette</label>
+      <label><input type="checkbox" id="gameBlackjack" checked> Blackjack</label>
+    </div>
+    <p class="hint" id="gamesHint"></p>
+
     <label class="field toggle">
       <span>Ask questions when a player misses one guess</span>
       <input type="checkbox" id="askQuestions" checked>
     </label>
 
+    </div><div class="settings-col">
     <h3>Difficulty odds (%)</h3>
     <label class="field"><span>Easy</span><input type="number" id="pEasy" min="0" max="100" value="45"></label>
     <label class="field"><span>Medium</span><input type="number" id="pMedium" min="0" max="100" value="40"></label>
@@ -62,6 +92,7 @@
 
     <h3>Categories for losers' questions</h3>
     <div class="cat-list" id="catList"></div>
+    </div></div>
 
     <button class="gold" id="saveSettings">SAVE</button>
     <button class="ghost" id="backFromSettings">BACK</button>
@@ -72,7 +103,9 @@
 <section id="selectScreen" class="screen hidden">
   <h2>Pick the players</h2>
   <div class="panel machine">
-    <div class="reels" id="reels"></div>
+    <div class="pick-counter" id="pickCounter"></div>
+    <div class="big-reveal" id="bigReveal">?</div>
+    <div class="lineup hidden" id="lineup"></div>
   </div>
   <div class="msg" id="selectMsg" aria-live="polite">Press SPIN to pick the players</div>
   <button class="gold" id="spinReels">SPIN</button>
@@ -82,43 +115,70 @@
 <section id="rouletteScreen" class="screen hidden">
   <h2 id="turnTitle"></h2>
 
-  <div class="wheelbox" id="wheelbox">
-    <canvas id="wheel" width="380" height="380"></canvas>
+  <!-- ROULETTE ---------------------------------------------------- -->
+  <div id="rouletteArea">
+    <div class="wheelbox" id="wheelbox">
+      <canvas id="wheel" width="380" height="380"></canvas>
+    </div>
+
+    <div class="bets" id="betRow">
+      <div class="bet-group">
+        <span class="bet-label">Color</span>
+        <div class="chips">
+          <button class="chip bet-color" data-c="red">RED</button>
+          <button class="chip bet-color" data-c="black">BLACK</button>
+          <button class="chip bet-color" data-c="green">GREEN</button>
+        </div>
+      </div>
+      <div class="bet-group">
+        <span class="bet-label">Parity</span>
+        <div class="chips">
+          <button class="chip parity" data-p="odd">ODD</button>
+          <button class="chip parity" data-p="even">EVEN</button>
+        </div>
+      </div>
+    </div>
+
+    <button class="gold hidden" id="spinWheel">SPIN</button>
   </div>
 
-  <div class="panel"><div class="players" id="status"></div></div>
+  <!-- BLACKJACK --------------------------------------------------- -->
+  <div id="blackjackArea" class="hidden">
+    <div class="bj-hand">
+      <span class="bj-label">DEALER <span id="botTotal"></span></span>
+      <div class="bj-cards" id="botCards"></div>
+    </div>
+    <div class="bj-hand">
+      <span class="bj-label">YOU <span id="playerTotal"></span></span>
+      <div class="bj-cards" id="playerCards"></div>
+    </div>
+    <div class="bets" id="bjActions">
+      <div class="chips">
+        <button class="chip bj-btn" id="hitBtn" style="--c:#2a6f97">HIT</button>
+        <button class="chip bj-btn" id="standBtn" style="--c:#c62828">STAND</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel players-panel"><h3>Players</h3><div class="players" id="status"></div></div>
 
   <div class="msg" id="bettingMsg" aria-live="polite">Place your bets</div>
-
-  <div class="bets" id="betRow">
-    <div class="bet-group">
-      <span class="bet-label">Color</span>
-      <div class="chips">
-        <button class="chip bet-color" data-c="red">RED</button>
-        <button class="chip bet-color" data-c="black">BLACK</button>
-        <button class="chip bet-color" data-c="green">GREEN</button>
-      </div>
-    </div>
-    <div class="bet-group">
-      <span class="bet-label">Parity</span>
-      <div class="chips">
-        <button class="chip parity" data-p="odd">ODD</button>
-        <button class="chip parity" data-p="even">EVEN</button>
-      </div>
-    </div>
-  </div>
-
-  <button class="gold hidden" id="spinWheel">SPIN</button>
 
   <!-- difficulty / category slot machine -->
   <div class="hidden" id="slotStage">
     <div class="slot-reel" id="difficultyReel">?</div>
-    <div class="slot-reel" id="categoryReel">?</div>
+    <div class="slot-reel hidden" id="categoryReel">?</div>
     <div class="fire hidden" id="fireFx">🔥🔥🔥</div>
   </div>
 
+  <!-- big reveal banners: what difficulty / category came up, then "your question is:" -->
+  <div class="reveal hidden" id="diffReveal"></div>
+  <div class="reveal hidden" id="catReveal"></div>
+  <div class="reveal hidden" id="qIntro">YOUR QUESTION IS...</div>
+
   <!-- question card -->
   <div class="hidden" id="questionBox">
+    <div class="qtimer-wrap"><div class="qtimer-bar" id="qTimerBar"></div><span class="qtimer-num" id="qTimerNum">0</span></div>
     <p class="qcat" id="qCatLabel"></p>
     <p class="qtext" id="qText"></p>
     <div class="qoptions" id="qOptions"></div>
