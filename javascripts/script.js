@@ -11,7 +11,7 @@ const TAU = Math.PI * 2;
 const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const show = (id, on) => $(id).classList.toggle('hidden', !on);
 const screen = id => { ['startScreen','gameSelectScreen','settingsScreen','selectScreen','rouletteScreen','historyScreen'].forEach(s => show(s, s === id)); };
-let gameMode = 'roulette';   // 'roulette' | 'blackjack' — chosen on the game-select screen (or fixed in Settings)
+let gameMode = 'roulette';   // 'roulette' | 'blackjack' | 'balloon' — chosen on the game-select screen (or fixed in Settings)
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 /* ---------- sound effects (Web Audio API — no sound files needed) ---------- */
@@ -37,6 +37,8 @@ const sound = {
   prize() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, i * 0.1, 0.26, 'square', 0.09)); },
   safe() { tone(880, 0, 0.3, 'triangle', 0.16); tone(1175, 0.1, 0.35, 'triangle', 0.12); },
   out() { tone(220, 0, 0.4, 'sawtooth', 0.14); },
+  pump(n) { tone(300 + n * 28, 0, 0.09, 'triangle', 0.12); tone(220 + n * 20, 0.05, 0.08, 'sine', 0.08); },
+  pop() { tone(900, 0, 0.05, 'square', 0.25); tone(120, 0.02, 0.35, 'sawtooth', 0.22); tone(70, 0.05, 0.4, 'sine', 0.3); },
   timerTick(urgent) { tone(urgent ? 1046 : 784, 0, 0.08, 'square', urgent ? 0.14 : 0.08); },
   timeout() { tone(140, 0, 0.5, 'sawtooth', 0.2); }
 };
@@ -60,13 +62,15 @@ async function fbPatch(path, data) {
 const blankRecord = () => ({ wins: 0, losses: 0, winsOdd: 0, winsEven: 0, winsRed: 0, winsBlack: 0, winsGreen: 0, questionsCorrect: 0, questionsAnswered: 0, happyFaces: 0,
   roulettePlayed: 0, blackjackPlayed: 0,
   bets: { red:{w:0,l:0}, black:{w:0,l:0}, green:{w:0,l:0}, odd:{w:0,l:0}, even:{w:0,l:0} },
-  bj: { w: 0, l: 0, p: 0, t21: 0 } });
+  bj: { w: 0, l: 0, p: 0, t21: 0 },
+  balloonPlayed: 0, bl: { w: 0, l: 0 } });
 // merge a (possibly old / partial) Firebase record onto the defaults, including the nested parts
 function normRecord(raw) {
   const base = blankRecord(), r = Object.assign(base, raw || {});
   r.bets = Object.assign(blankRecord().bets, (raw && raw.bets) || {});
   Object.keys(r.bets).forEach(k => r.bets[k] = Object.assign({ w: 0, l: 0 }, r.bets[k]));
   r.bj = Object.assign({ w: 0, l: 0, p: 0, t21: 0 }, (raw && raw.bj) || {});
+  r.bl = Object.assign({ w: 0, l: 0 }, (raw && raw.bl) || {});
   return r;
 }
 
@@ -142,7 +146,48 @@ const QUESTIONS = {
       { q: 'Which sentence contrasts past habit with the present correctly?', options: ['I used to hate vegetables, but now I love them.', 'I use to hate vegetables, but now I loved them.', 'I am used to hate vegetables, but now I love them.'], correct: 0 },
       { q: 'Choose the correct form: "It took time, but I ___ to the new schedule."', options: ['got used', 'used', 'use'], correct: 0 }
     ]
+  },
+  "Gerunds": {
+    easy: [
+      { q: 'Which is correct: "I love ___ user interfaces."', options: ['designing', 'design', 'to designing'], correct: 0 },
+      { q: 'Complete the sentence: "She enjoys ___ with Python."', options: ['working', 'work', 'worked'], correct: 0 },
+      { q: 'What is the gerund of "write"?', options: ['writing', 'writeing', 'writting'], correct: 0 }
+    ],
+    medium: [
+      { q: 'Which sentence is correct?', options: ['He hates writing documentation.', 'He hates write documentation.', 'He hates to writing documentation.'], correct: 0 },
+      { q: 'What is the gerund of "run"?', options: ['running', 'runing', 'runeing'], correct: 0 },
+      { q: 'Which sentence shows a NEUTRAL feeling?', options: ["I don't mind testing the code.", "I can't stand testing the code.", 'I love testing the code.'], correct: 0 }
+    ],
+    hard: [
+      { q: 'Find the error: "They don\u2019t mind to work late on release days."', options: ['"to work" should be "working"', '"don\u2019t mind" should be "hate"', '"late" should be "lately"'], correct: 0 },
+      { q: 'What is the correct gerund of "program"?', options: ['programming', 'programing', 'programeing'], correct: 0 },
+      { q: 'Which sentence is correct?', options: ["We can't stand using slow internet.", "We can't stand use slow internet.", "We can't stand to using slow internet."], correct: 0 }
+    ]
   }
+};
+
+/* Gerunds also has timed, open-answer tasks (15 s, then the group judges the answer) */
+const GERUND_TASKS = {
+  negative: [
+    { prompt: 'Make it NEGATIVE:\n"I enjoy designing user interfaces."', answer: "I don't enjoy designing user interfaces." },
+    { prompt: 'Make it NEGATIVE:\n"She likes working with Python."', answer: "She doesn't like working with Python." },
+    { prompt: 'Make it NEGATIVE:\n"We love fixing legacy code."', answer: "We don't love fixing legacy code." },
+    { prompt: 'Make it NEGATIVE:\n"He enjoys writing documentation."', answer: "He doesn't enjoy writing documentation." },
+    { prompt: 'Make it NEGATIVE:\n"They prefer testing the code."', answer: "They don't prefer testing the code." },
+    { prompt: 'Make it NEGATIVE:\n"I like attending daily meetings."', answer: "I don't like attending daily meetings." }
+  ],
+  question: [
+    { prompt: 'Turn it into a QUESTION:\n"You enjoy writing documentation."', answer: 'Do you enjoy writing documentation?' },
+    { prompt: 'Turn it into a QUESTION:\n"She likes working with Python."', answer: 'Does she like working with Python?' },
+    { prompt: 'Turn it into a QUESTION:\n"They hate attending long meetings."', answer: 'Do they hate attending long meetings?' },
+    { prompt: 'Turn it into a QUESTION:\n"He prefers coding over writing reports."', answer: 'Does he prefer coding over writing reports?' },
+    { prompt: 'Turn it into a QUESTION:\n"You like fixing other people\u2019s code."', answer: 'Do you like fixing other people\u2019s code?' }
+  ],
+  create: [
+    { prompt: 'CREATE a question about an IT task, using a preference verb + gerund.', answer: 'Example: "Do you enjoy configuring networks?"' },
+    { prompt: 'CREATE a question to ask a classmate which task they hate doing at work.', answer: 'Example: "Which IT task do you hate doing?"' },
+    { prompt: 'CREATE a question about something a teammate doesn\u2019t mind doing.', answer: 'Example: "Do you mind working from home?"' }
+  ]
 };
 const ALL_CATEGORIES = Object.keys(QUESTIONS);
 
@@ -158,7 +203,7 @@ const settings = {
   askQuestions: true,
   odds: { easy: 45, medium: 40, hard: 15 },
   enabledCategories: new Set(ALL_CATEGORIES),
-  games: new Set(['roulette', 'blackjack'])
+  games: new Set(['roulette', 'blackjack', 'balloon'])
 };
 
 /* ---------- Settings screen wiring ---------- */
@@ -203,17 +248,19 @@ function checkOdds() {
 ['pEasy', 'pMedium', 'pHard'].forEach(id => $(id).addEventListener('input', checkOdds));
 
 function checkGames() {
-  const ok = $('gameRoulette').checked || $('gameBlackjack').checked;
+  const ok = $('gameRoulette').checked || $('gameBlackjack').checked || $('gameBalloon').checked;
   $('gamesHint').textContent = ok ? '' : 'Keep at least one game enabled.';
   return ok;
 }
 $('gameRoulette').addEventListener('change', checkGames);
 $('gameBlackjack').addEventListener('change', checkGames);
+$('gameBalloon').addEventListener('change', checkGames);
 
 $('gearBtn').onclick = () => {
   buildCountGrid(); $('namesBox').value = settings.names.join('\n'); checkNames();
   $('gameRoulette').checked = settings.games.has('roulette');
   $('gameBlackjack').checked = settings.games.has('blackjack');
+  $('gameBalloon').checked = settings.games.has('balloon');
   screen('settingsScreen');
 };
 $('backFromSettings').onclick = () => screen('startScreen');
@@ -227,6 +274,7 @@ $('saveSettings').onclick = () => {
   const games = new Set();
   if ($('gameRoulette').checked) games.add('roulette');
   if ($('gameBlackjack').checked) games.add('blackjack');
+  if ($('gameBalloon').checked) games.add('balloon');
   settings.games = games;
   screen('startScreen');
 };
@@ -239,6 +287,7 @@ $('startBtn').onclick = () => {
 };
 $('pickRoulette').onclick = () => { gameMode = 'roulette'; buildReels(); screen('selectScreen'); };
 $('pickBlackjack').onclick = () => { gameMode = 'blackjack'; buildReels(); screen('selectScreen'); };
+$('pickBalloon').onclick = () => { gameMode = 'balloon'; buildReels(); screen('selectScreen'); };
 $('backFromGameSelect').onclick = () => screen('startScreen');
 
 /* ---------- classification table (reads every roster name's record from Firebase) ---------- */
@@ -272,7 +321,9 @@ function resultDetailHTML(rec) {
     ? '<div class="rgrid">' + chip('HANDS', rec.bj.w, rec.bj.l) + '<div class="rchip"><span>PUSH</span><b>🤝 ' + rec.bj.p + '</b></div>' +
       '<div class="rchip"><span>21s</span><b>🃏 ' + rec.bj.t21 + '</b></div></div><div class="rnote">Played ' + rec.blackjackPlayed + ' time(s)</div>'
     : '<div class="rnote">Never played</div>';
-  return '<div class="rbox"><h4>🎡 ROULETTE</h4>' + roul + '</div><div class="rbox"><h4>🃏 BLACKJACK</h4>' + bj + '</div>';
+  const hasBl = rec.balloonPlayed > 0 || rec.bl.w + rec.bl.l > 0;
+  const bal = hasBl ? '<div class="rgrid">' + chip('ROUNDS', rec.bl.w, rec.bl.l) + '</div><div class="rnote">Won ✅ / Popped ❌ — played ' + rec.balloonPlayed + ' time(s)</div>' : '<div class="rnote">Never played</div>';
+  return '<div class="rbox"><h4>🎈 BALLOON</h4>' + bal + '</div><div class="rbox"><h4>🎡 ROULETTE</h4>' + roul + '</div><div class="rbox"><h4>🃏 BLACKJACK</h4>' + bj + '</div>';
 }
 $('historyBody').onclick = e => {
   const btn = e.target.closest('.qbtn'); if (!btn) return;
@@ -371,8 +422,8 @@ let pendingList = [], qIndex = 0;
 function startGamePhase() {
   players = chosenPlayers.map(name => ({ name, colorBet: null, parityBet: null, status: '', landedColor: null, landedParity: null, happyGain: 0 }));
   turn = 0; phase = 'spin'; screen('rouletteScreen');
-  show('rouletteArea', gameMode === 'roulette'); show('blackjackArea', gameMode === 'blackjack');
-  if (gameMode === 'roulette') beginSpinTurn(); else beginBlackjackTurn();
+  show('rouletteArea', gameMode === 'roulette'); show('blackjackArea', gameMode === 'blackjack'); show('balloonArea', gameMode === 'balloon');
+  if (gameMode === 'roulette') beginSpinTurn(); else if (gameMode === 'blackjack') beginBlackjackTurn(); else { resetBalloon(); if (players.length < 2) endBalloonMatch(0); else beginBalloonTurn(); }
 }
 
 function renderSeats() {
@@ -380,7 +431,7 @@ function renderSeats() {
   $('status').innerHTML = players.map((p, i) => {
     // one correct guess = yellow aura ("pending"); zero correct guesses = red aura ("pending-hard")
     const cls = p.status === 'pending' && p.hitCount === 0 ? 'pending-hard' : p.status;
-    const label = p.status === 'pending' ? (p.hitCount === 0 ? '?!' : '?') : ({safe:'SAFE', out:'OUT'}[p.status] || '&nbsp;');
+    const label = p.status === 'pending' ? (p.balloonResult === 'popped' ? '💥' : p.hitCount === 0 ? '?!' : '?') : ({safe:'SAFE', out:'OUT'}[p.status] || '&nbsp;');
     return '<div class="seat ' + cls + (i === turn && !ended ? ' current' : '') + '"><i class="n">' + (i + 1) + '</i><b>' + p.name + '</b><span>' + label + '</span></div>';
   }).join('');
 }
@@ -570,7 +621,9 @@ function resolveBlackjack() {
 /* ---- label the NEXT TURN button with who (or what) comes next ---- */
 function setNextLabel() {
   const btn = $('nextTurn');
-  if (phase === 'spin') {
+  if (phase === 'spin' && gameMode === 'balloon') {
+    btn.textContent = players.some(p => p.status === 'pending') ? "LET'S CONTINUE WITH THE QUESTIONS" : 'SEE RESULTS';
+  } else if (phase === 'spin') {
     btn.textContent = (turn + 1 < players.length) ? "CONTINUE: " + players[turn + 1].name : "LET'S CONTINUE WITH THE QUESTIONS";
   } else {
     btn.textContent = (qIndex + 1 < pendingList.length) ? "CONTINUE: " + players[pendingList[qIndex + 1]].name : 'SEE RESULTS';
@@ -589,9 +642,12 @@ function beginQuestionTurn() {
   const p = players[turn];
   $('turnTitle').textContent = p.name + ": answer to be safe";
   ['betRow','spinWheel','questionBox','nextTurn','endBox','diffReveal','catReveal','qIntro','bjActions'].forEach(id => show(id, false));
-  show('wheelbox', false); show('rouletteArea', false); show('blackjackArea', false);
+  show('wheelbox', false); show('rouletteArea', false); show('blackjackArea', false); show('balloonArea', false);
   $('bettingMsg').textContent = (p.hitCount === 1 ? 'One correct guess! ' : 'No correct guesses — tougher odds. ') + "Let\u2019s see what question comes up...";
-  runDifficultyThenCategory();
+  if (pendingCreated) {
+    $('bettingMsg').textContent = 'Answer the question created by ' + pendingCreated.from + '!';
+    runAnswerCreated();
+  } else runDifficultyThenCategory();
 }
 
 /* ---- generic slot-machine flicker: lands on finalText, ticking as it goes ---- */
@@ -657,21 +713,30 @@ function askQuestion(category, difficulty) {
   const p = players[turn];
   p.qCategory = category; p.qDifficulty = difficulty;   // kept for the round summary
   const pool = (QUESTIONS[category] && QUESTIONS[category][difficulty]) || [];
+  // Gerunds: most of the time it is a timed open task (negative / question / create-a-question)
+  if (category === 'Gerunds' && Math.random() < 0.65) {
+    const kinds = ['negative', 'question'];
+    if (qIndex < pendingList.length - 1) kinds.push('create');   // the LAST player never gets "create a question" (nobody left to answer it)
+    return askOpenQuestion(category, difficulty, kinds[rnd(0, kinds.length - 1)]);
+  }
   if (pool.length === 0) { p.qResult = 'n/a'; finalize(true, true); return; }   // no question available -> treat as safe
   const q = pool[rnd(0, pool.length - 1)];
   show('questionBox', true);
   $('qCatLabel').textContent = category + ' — ' + difficulty.toUpperCase();
   $('qText').textContent = q.q;
   const box = $('qOptions'); box.innerHTML = '';
-  q.options.forEach((opt, idx) => {
+  const opts = q.options.map((t, i) => ({ t, ok: i === q.correct }));
+  for (let k = opts.length - 1; k > 0; k--) { const r = rnd(0, k); [opts[k], opts[r]] = [opts[r], opts[k]]; }   // shuffle the answers
+  const correctIdx = opts.findIndex(o => o.ok);
+  opts.forEach((o, idx) => {
     const btn = document.createElement('button');
-    btn.textContent = opt;
+    btn.textContent = o.t;
     btn.onclick = () => {
       clearInterval(timerId);
       [...box.children].forEach(b => b.disabled = true);
-      const ok = idx === q.correct;
+      const ok = idx === correctIdx;
       btn.classList.add(ok ? 'correct' : 'wrong');
-      if (!ok) box.children[q.correct].classList.add('correct');
+      if (!ok) box.children[correctIdx].classList.add('correct');
       p.qResult = ok ? 'correct' : 'wrong';
       (ok ? sound.correct : sound.wrong)();
       setTimeout(() => { show('questionBox', false); finalize(ok, true); }, 900);
@@ -695,19 +760,96 @@ function askQuestion(category, difficulty) {
       clearInterval(timerId);
       sound.timeout();
       [...box.children].forEach(b => b.disabled = true);
-      box.children[q.correct].classList.add('correct');
+      box.children[correctIdx].classList.add('correct');
       p.qResult = 'timeout';
       setTimeout(() => { show('questionBox', false); finalize(false, true); }, 900);
     }
   }, 1000);
 }
 
+/* ---------- Gerunds: timed open tasks (15 s) judged by the group ---------- */
+const OPEN_TIME = 15;
+const OPEN_LABEL = { negative: 'MAKE IT NEGATIVE', question: 'MAKE A QUESTION', create: 'CREATE A QUESTION', answer: 'ANSWER THE QUESTION' };
+let pendingCreated = null;     // a question one player created; the NEXT player has to answer it
+function runCountdown(total, onEnd) {
+  const bar = $('qTimerBar'), num = $('qTimerNum');
+  let remaining = total;
+  bar.classList.remove('low'); bar.style.width = '100%'; num.textContent = remaining;
+  const id = setInterval(() => {
+    remaining--;
+    bar.style.width = Math.max(0, remaining / total * 100) + '%';
+    num.textContent = Math.max(0, remaining);
+    const urgent = remaining <= 5;
+    bar.classList.toggle('low', urgent);
+    if (remaining > 0) sound.timerTick(urgent);
+    if (remaining <= 0) { clearInterval(id); sound.timeout(); onEnd(); }
+  }, 1000);
+}
+function askOpenQuestion(category, difficulty, kind) {
+  const p = players[turn];
+  const task = GERUND_TASKS[kind][rnd(0, GERUND_TASKS[kind].length - 1)];
+  p.qCategory = category; p.qDifficulty = difficulty;
+  show('questionBox', true);
+  $('qCatLabel').textContent = category + ' — ' + OPEN_LABEL[kind];
+  $('qText').textContent = task.prompt;
+  const box = $('qOptions');
+  if (kind === 'create') {
+    box.innerHTML = '<div class="qhint">The NEXT player will have to answer your question!</div>' +
+      '<input id="createInput" class="qinput" type="text" maxlength="140" autocomplete="off" placeholder="Type your question here...">';
+    const inp = $('createInput'); inp.focus();
+  } else {
+    box.innerHTML = '<div class="qhint">Say or write your answer before the time runs out.</div>';
+  }
+  runCountdown(OPEN_TIME, () => {
+    if (kind === 'create') {
+      const typed = ($('createInput') ? $('createInput').value : '').trim();
+      pendingCreated = { from: p.name, text: typed };
+      return showVerdict({ answer: (typed ? 'Your question: "' + typed + '"\n' : '') + task.answer }, 'create');
+    }
+    showVerdict(task, kind);
+  });
+}
+/* the NEXT player's turn: answer the question that the previous player created */
+async function runAnswerCreated() {
+  const c = pendingCreated; pendingCreated = null;
+  const p = players[turn];
+  p.qCategory = 'Gerunds'; p.qDifficulty = 'easy';
+  await revealBanner('qIntro', 'ANSWER ' + c.from.toUpperCase() + "'S QUESTION!", 1500);
+  show('questionBox', true);
+  $('qCatLabel').textContent = 'Gerunds — ' + OPEN_LABEL.answer;
+  $('qText').textContent = c.from + ' asks:\n' + (c.text ? '"' + c.text + '"' : '(they asked it out loud)');
+  $('qOptions').innerHTML = '<div class="qhint">' + p.name + ', answer ' + c.from + "'s question before the time runs out.</div>";
+  runCountdown(OPEN_TIME, () => showVerdict({ answer: '' }, 'answer'));
+}
+function showVerdict(task, kind) {
+  const p = players[turn];
+  $('qCatLabel').textContent = p.qCategory + ' — ' + OPEN_LABEL[kind];
+  $('qText').textContent = "\u23F0 Time's up! " + (kind === 'create' ? 'Was the question well made?' : 'Was the answer correct?');
+  const box = $('qOptions'); box.innerHTML = '';
+  if (task.answer) {
+    const ref = document.createElement('div'); ref.className = 'qref';
+    ref.textContent = (kind === 'negative' || kind === 'question' ? 'Model answer: ' : '') + task.answer; box.appendChild(ref);
+  }
+  const row = document.createElement('div'); row.className = 'verdict-row'; box.appendChild(row);
+  [['\u2705 CORRECT', true], ['\u274C WRONG', false]].forEach(([label, ok]) => {
+    const b = document.createElement('button'); b.textContent = label; b.className = ok ? 'v-ok' : 'v-no';
+    b.onclick = () => {
+      [...row.children].forEach(x => x.disabled = true);
+      b.classList.add(ok ? 'correct' : 'wrong');
+      p.qResult = ok ? 'correct' : 'wrong';
+      (ok ? sound.correct : sound.wrong)();
+      $('qText').textContent = ok ? 'Answered correctly!' : 'Answered wrong.';
+      setTimeout(() => { show('questionBox', false); finalize(ok, true); }, 1100);
+    };
+    row.appendChild(b);
+  });
+}
+
 /* ---------- finalize the current player: update seat + Firebase history ---------- */
-function finalize(safe, answeredQuestion) {
+function finalize(safe, answeredQuestion, quiet) {
   const p = players[turn];
   p.status = safe ? 'safe' : 'out';
-  (safe ? sound.safe : sound.out)();
-  safe ? bounceAll() : restoreAll();      // win -> decorations bounce, fail -> they return to their spot
+  if (!quiet) { (safe ? sound.safe : sound.out)(); safe ? bounceAll() : restoreAll(); }      // win -> decorations bounce, fail -> they return to their spot
   renderSeats();
 
   updateUserHistory(p.name, rec => {
@@ -722,6 +864,8 @@ function finalize(safe, answeredQuestion) {
       rec.roulettePlayed++;
       rec.bets[p.colorBet][p.colorBet === p.landedColor ? 'w' : 'l']++;
       if (p.parityBet && p.landedParity) rec.bets[p.parityBet][p.parityBet === p.landedParity ? 'w' : 'l']++;
+    } else if (p.balloonResult) {           // balloon
+      rec.balloonPlayed++; rec.bl[p.balloonResult === 'popped' ? 'l' : 'w']++;
     } else if (p.bjResult) {                // blackjack
       rec.blackjackPlayed++;
       rec.bj[{ win: 'w', lose: 'l', push: 'p' }[p.bjResult]]++;
@@ -736,9 +880,10 @@ function finalize(safe, answeredQuestion) {
 }
 
 $('nextTurn').onclick = () => {
-  if (phase === 'spin') {
+  if (phase === 'spin' && gameMode === 'balloon') { startQuestionPhase(); }
+  else if (phase === 'spin') {
     turn++;
-    if (turn < players.length) { gameMode === 'roulette' ? beginSpinTurn() : beginBlackjackTurn(); }
+    if (turn < players.length) { gameMode === 'roulette' ? beginSpinTurn() : gameMode === 'blackjack' ? beginBlackjackTurn() : beginBalloonTurn(); }
     else startQuestionPhase();
   } else {
     qIndex++;
@@ -748,7 +893,7 @@ $('nextTurn').onclick = () => {
 
 function finishGame() {
   show('nextTurn', false);
-  show('wheelbox', false); show('rouletteArea', false); show('blackjackArea', false); show('bjActions', false);
+  show('wheelbox', false); show('rouletteArea', false); show('blackjackArea', false); show('balloonArea', false); show('bjActions', false);
   $('turnTitle').textContent = 'Round summary';
   $('bettingMsg').textContent = '';
   (players.some(p => p.status === 'safe') ? sound.correct : sound.select)();
@@ -761,6 +906,9 @@ function finishGame() {
     } else if (p.bjResult) {
       lines.push('Blackjack: you ' + p.bjPlayerTotal + ' — dealer ' + p.bjBotTotal +
         ' (' + ({win:'win', lose:'loss', push:'push'}[p.bjResult]) + ')');
+    }
+    else if (p.balloonResult) {
+      lines.push('Balloon: ' + (p.balloonResult === 'popped' ? 'it popped on you 💥' : 'last one standing 🏆'));
     }
     if (p.qCategory) {
       const resultLabel = { correct: 'answered correctly', wrong: 'answered wrong', timeout: 'ran out of time', 'n/a': 'no question available' }[p.qResult] || p.qResult;
@@ -861,3 +1009,101 @@ function startBounce(sp) {
 const bounceAll  = () => decoSpans.forEach(startBounce);
 const restoreAll = () => decoSpans.forEach(sp => sp._stop && sp._stop());
 decoSpans.forEach(sp => sp.addEventListener('click', () => startBounce(sp)));
+
+
+/* =========================================================
+   BALLOON — elimination game. ONE balloon goes around the table:
+   on your turn you INFLATE it as much as you dare (at least once),
+   then PASS it to the next player still in. Whoever it pops on is
+   eliminated, a new balloon starts with the players who are left,
+   and the LAST one standing wins.
+   ========================================================= */
+let balloonPumps = 0, balloonLimit = 10, turnPumps = 0, balloonBusy = false;
+const aliveIdx = () => players.map((p, i) => i).filter(i => players[i].balloonResult !== 'popped');
+function nextAlive(from) {
+  for (let k = 1; k <= players.length; k++) {
+    const j = (from + k) % players.length;
+    if (players[j].balloonResult !== 'popped') return j;
+  }
+  return from;
+}
+function drawBalloon() {
+  const w = Math.min(220, 60 + balloonPumps * 8);                  // grows with every pump
+  const b = $('balloon');
+  b.style.width = w + 'px';
+  b.style.setProperty('--wob', Math.max(0.25, 1.6 - balloonPumps * 0.07) + 's');   // wobbles faster as it gets tense
+  const hue = Math.max(0, 205 - balloonPumps * 11);                 // blue -> red
+  $('balloonBody').setAttribute('fill', 'hsl(' + hue + ',80%,52%)');
+  $('balloonKnot').setAttribute('fill', 'hsl(' + hue + ',80%,40%)');
+  $('pumpInfo').textContent = 'Pumps so far: ' + balloonPumps + '  —  Players left: ' + aliveIdx().length;
+}
+function resetBalloon() {
+  balloonPumps = 0; balloonLimit = rnd(5, 20);                       // hidden: nobody knows when it pops
+  $('balloon').classList.remove('gone'); show('boom', false);
+  drawBalloon();
+}
+function beginBalloonTurn() {
+  renderSeats();
+  const p = players[turn];
+  turnPumps = 0; balloonBusy = false;
+  $('turnTitle').textContent = p.name + "'s turn";
+  ['nextTurn', 'endBox'].forEach(id => show(id, false));
+  show('balloonActions', true); $('pumpBtn').disabled = false; $('passBtn').disabled = true;
+  $('bettingMsg').textContent = p.name + ': inflate the balloon as much as you dare, then pass it to ' + players[nextAlive(turn)].name + '. Inflate at least once!';
+  sound.select();
+}
+function showBoom(emoji, msg) {
+  $('balloon').classList.add('gone');
+  document.querySelector('.boom-emoji').textContent = emoji;
+  $('boomMsg').textContent = msg;
+  show('boom', true);
+  const bx = $('boom'); bx.style.animation = 'none'; void bx.offsetWidth; bx.style.animation = '';
+}
+function popBalloon() {
+  const p = players[turn];
+  balloonBusy = true;
+  show('balloonActions', false);
+  showBoom('💥', p.name + ' LOST!'); sound.pop();
+  $('bettingMsg').textContent = '💥 The balloon popped on ' + p.name + '! ' + p.name + ' is out.';
+  p.balloonResult = 'popped';
+  p.status = 'pending'; p.hitCount = 0;            // out of the balloon; answers a question later (if questions are on)
+  restoreAll();                                     // a loss: the decorations stop and go back
+  renderSeats();
+  setTimeout(() => {
+    const alive = aliveIdx();
+    if (alive.length <= 1) return endBalloonMatch(alive[0]);
+    resetBalloon();                                 // new balloon, same game, fewer players
+    turn = nextAlive(turn);
+    beginBalloonTurn();
+  }, 2400);
+}
+function endBalloonMatch(w) {
+  show('balloonActions', false);
+  if (!settings.askQuestions) {                     // no questions: the eliminated players are simply out
+    players.forEach((q, i) => { if (q.status === 'pending') { turn = i; finalize(false, false, true); } });
+  }
+  turn = w;
+  const win = players[w];
+  win.balloonResult = 'last';
+  showBoom('🏆', win.name + ' WINS!'); sound.correct();
+  $('bettingMsg').textContent = '🏆 ' + win.name + ' is the last one standing and wins the balloon game!';
+  finalize(true, false);
+}
+$('pumpBtn').onclick = () => {
+  if (balloonBusy) return;
+  balloonPumps++; turnPumps++;
+  sound.pump(balloonPumps);
+  if (balloonPumps >= balloonLimit) { $('pumpInfo').textContent = 'Pumps so far: ' + balloonPumps; return popBalloon(); }
+  drawBalloon();
+  const b = $('balloon'); b.classList.remove('pumped'); void b.offsetWidth; b.classList.add('pumped');
+  $('passBtn').disabled = false;
+};
+$('passBtn').onclick = () => {
+  if (balloonBusy || turnPumps === 0) return;
+  balloonBusy = true;
+  const p = players[turn], nxt = nextAlive(turn);
+  show('balloonActions', false);
+  $('bettingMsg').textContent = p.name + ' passes the balloon to ' + players[nxt].name + '...';
+  sound.select();
+  setTimeout(() => { turn = nxt; beginBalloonTurn(); }, 900);
+};
