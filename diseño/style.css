@@ -448,3 +448,35 @@ body::after{content:""; position:fixed; inset:0; z-index:0; pointer-events:none;
 .deco span.away{visibility:hidden}
 .bouncer{position:fixed; left:0; top:0; z-index:50; font-size:2.2rem; line-height:1; cursor:pointer; user-select:none;
   filter:drop-shadow(3px 3px 0 #000); will-change:transform}
+
+
+/* ---- Gerunds: open tasks + verdict ---- */
+.qtext{white-space:pre-line}
+.qhint{padding:14px; border:2px dashed var(--gold); text-align:center; color:#ffe9a8; font-size:1.05rem}
+.qref{padding:12px 14px; background:rgba(255,255,255,.06); border-left:5px solid var(--gold); font-size:1.1rem; margin-bottom:6px}
+.verdict-row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.verdict-row button{font-size:1.05rem}
+.verdict-row .v-ok{border-color:var(--green)} .verdict-row .v-no{border-color:var(--red)}
+.verdict-row button.wrong{background:rgba(200,40,40,.35); border-color:var(--red)}
+.hint.info{color:#cfe8d8; font-size:.8rem; line-height:1.5; margin-top:8px}
+.qref{white-space:pre-line}
+.qinput{width:100%; box-sizing:border-box; margin-top:10px; padding:12px; font:inherit; font-size:1.05rem; color:#fff; background:#000; border:3px solid var(--gold); border-radius:0}
+.qinput:focus{outline:3px solid #fff; outline-offset:2px}
+
+
+/* ---- BALLOON game ---- */
+.balloon-stage{position:relative; height:clamp(250px,40vh,340px); display:flex; align-items:flex-end; justify-content:center; margin:6px 0 4px;
+  background:radial-gradient(ellipse at 50% 100%, rgba(255,255,255,.08), transparent 65%)}
+.balloon{--wob:1.6s; width:60px; transform-origin:50% 100%; animation:wobble var(--wob) ease-in-out infinite alternate; transition:width .18s steps(4)}
+.balloon svg{display:block; width:100%; height:auto; overflow:visible; filter:drop-shadow(4px 4px 0 rgba(0,0,0,.45))}
+.balloon.pumped{animation:wobble var(--wob) ease-in-out infinite alternate, squash .2s steps(3)}
+.balloon.gone{display:none}
+@keyframes wobble{from{transform:rotate(-4deg)}to{transform:rotate(4deg)}}
+@keyframes squash{0%{scale:1}40%{scale:1.12 .92}100%{scale:1}}
+.boom{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:10px;
+  animation:boomIn .6s steps(6)}
+.boom-emoji{font-size:clamp(5rem,16vw,9rem); line-height:1; filter:drop-shadow(5px 5px 0 #000)}
+.boom-msg{font:700 clamp(1.1rem,4vw,2rem) "Press Start 2P",monospace; color:#ff6b6b; text-shadow:4px 4px 0 #000}
+@keyframes boomIn{0%{transform:scale(.2) rotate(-20deg); opacity:0}60%{transform:scale(1.25) rotate(6deg); opacity:1}100%{transform:scale(1) rotate(0)}}
+.pump-info{text-align:center; font:700 .7rem "Press Start 2P",monospace; color:var(--gold); margin:6px 0 10px; text-shadow:2px 2px 0 #000}
+@media (prefers-reduced-motion:reduce){.balloon,.balloon.pumped{animation:none}}
