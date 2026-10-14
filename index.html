@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="diseño/style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -39,6 +39,7 @@
   <div class="panel game-pick">
     <button class="gold game-btn" id="pickRoulette">🎡 ROULETTE</button>
     <button class="gold game-btn" id="pickBlackjack">🃏 BLACKJACK</button>
+    <button class="gold game-btn" id="pickBalloon">🎈 BALLOON</button>
   </div>
   <button class="ghost" id="backFromGameSelect">BACK</button>
 </section>
@@ -75,6 +76,7 @@
     <div class="cat-list">
       <label><input type="checkbox" id="gameRoulette" checked> Roulette</label>
       <label><input type="checkbox" id="gameBlackjack" checked> Blackjack</label>
+      <label><input type="checkbox" id="gameBalloon" checked> Balloon</label>
     </div>
     <p class="hint" id="gamesHint"></p>
 
@@ -92,6 +94,7 @@
 
     <h3>Categories for losers' questions</h3>
     <div class="cat-list" id="catList"></div>
+    <p class="hint info">With <b>Gerunds</b> on, some questions are timed (15 s) open tasks: make a sentence negative, turn it into a question, or create a question for the next player to answer.</p>
     </div></div>
 
     <button class="gold" id="saveSettings">SAVE</button>
@@ -160,6 +163,28 @@
     </div>
   </div>
 
+  <!-- BALLOON ---------------------------------------------------- -->
+  <div id="balloonArea" class="hidden">
+    <div class="balloon-stage" id="balloonStage">
+      <div class="balloon" id="balloon">
+        <svg viewBox="0 0 100 135" aria-hidden="true">
+          <path d="M50 108 C46 118 56 124 50 134" fill="none" stroke="#ddd" stroke-width="1.5"/>
+          <polygon points="50,98 43,109 57,109" id="balloonKnot"/>
+          <ellipse cx="50" cy="50" rx="42" ry="49" id="balloonBody" stroke="#000" stroke-width="3"/>
+          <ellipse cx="34" cy="32" rx="8" ry="14" fill="#fff" opacity=".35" transform="rotate(25 34 32)"/>
+        </svg>
+      </div>
+      <div class="boom hidden" id="boom"><div class="boom-emoji">💥</div><div class="boom-msg" id="boomMsg"></div></div>
+    </div>
+    <div class="pump-info" id="pumpInfo"></div>
+    <div class="bets" id="balloonActions">
+      <div class="chips">
+        <button class="chip bj-btn" id="pumpBtn" style="--c:#2a6f97">INFLATE</button>
+        <button class="chip bj-btn" id="passBtn" style="--c:#c62828">PASS</button>
+      </div>
+    </div>
+  </div>
+
   <div class="panel players-panel"><h3>Players</h3><div class="players" id="status"></div></div>
 
   <div class="msg" id="bettingMsg" aria-live="polite">Place your bets</div>
@@ -193,7 +218,7 @@
     <button class="ghost" id="toStart">BACK TO START</button>
   </div>
 </section>
-  
-<script src="javascripts/script.js"></script>
+
+<script src="script.js"></script>
 </body>
 </html>
