@@ -192,9 +192,9 @@ const GERUND_TASKS = {
 const ALL_CATEGORIES = Object.keys(QUESTIONS);
 
 /* ---------- Default roster (editable in Settings) ---------- */
-const DEFAULT_NAMES = ['Sneyder','Esteban','Sofía','Santiago','Leonel','Jose Angel','Frayden','Gouveia',
+const DEFAULT_NAMES = ['Sneyder','Sofía','Santiago','Leonel','Jose Angel','Frayden','Gouveia',
   'Raymond','Marlon','Julián','Sebastian','Camilo','Yeison','Deyvid','Camila','Mauricio','Nicole',
-  'Dilan','Stephanie','Karen','Anaya','Yojhan','Felis'];
+  'Dilan','Stephanie','Karen','Anaya','Yojhan','Mario'];
 
 /* ---------- Settings state (defaults) ---------- */
 const settings = {
@@ -1028,17 +1028,17 @@ function nextAlive(from) {
   return from;
 }
 function drawBalloon() {
-  const w = Math.min(220, 60 + balloonPumps * 8);                  // grows with every pump
+  const w = Math.min(230, 60 + balloonPumps * 5);                  // grows with every pump
   const b = $('balloon');
   b.style.width = w + 'px';
-  b.style.setProperty('--wob', Math.max(0.25, 1.6 - balloonPumps * 0.07) + 's');   // wobbles faster as it gets tense
-  const hue = Math.max(0, 205 - balloonPumps * 11);                 // blue -> red
+  b.style.setProperty('--wob', Math.max(0.25, 1.6 - balloonPumps * 0.04) + 's');   // wobbles faster as it gets tense
+  const hue = Math.max(0, 205 - balloonPumps * 6);                 // blue -> red
   $('balloonBody').setAttribute('fill', 'hsl(' + hue + ',80%,52%)');
   $('balloonKnot').setAttribute('fill', 'hsl(' + hue + ',80%,40%)');
   $('pumpInfo').textContent = 'Pumps so far: ' + balloonPumps + '  —  Players left: ' + aliveIdx().length;
 }
 function resetBalloon() {
-  balloonPumps = 0; balloonLimit = rnd(5, 20);                       // hidden: nobody knows when it pops
+  balloonPumps = 0; balloonLimit = rnd(14, 36);                       // hidden: nobody knows when it pops
   $('balloon').classList.remove('gone'); show('boom', false);
   drawBalloon();
 }
